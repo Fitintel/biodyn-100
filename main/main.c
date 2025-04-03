@@ -61,7 +61,6 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
 #define GATTS_NUM_HANDLE_TEST_B     4
 
 #define DEVICE_NAME            "BIODYN-100"
-#define TEST_MANUFACTURER_DATA_LEN  17
 
 #define GATTS_DEMO_CHAR_VAL_LEN_MAX 0x40
 
@@ -90,8 +89,11 @@ static uint8_t adv_service_uuid128[32] = {
 };
 
 // The length of adv data must be less than 31 bytes
-//static uint8_t test_manufacturer[TEST_MANUFACTURER_DATA_LEN] =  {0x12, 0x23, 0x45, 0x56};
-//adv data
+// TODO: Use this to differentiate device type
+#define MANUFACTURER_DATA_LEN  17
+static uint8_t manufacturer_data[MANUFACTURER_DATA_LEN] =  {0x12, 0x23, 0x45, 0x56};
+
+// Advertising data
 static esp_ble_adv_data_t adv_data = {
     .set_scan_rsp = false,
     .include_name = true,
@@ -99,8 +101,8 @@ static esp_ble_adv_data_t adv_data = {
     .min_interval = 0x0006, //slave connection min interval, Time = min_interval * 1.25 msec
     .max_interval = 0x000C, //slave connection max interval, Time = max_interval * 1.25 msec
     .appearance = 0x00,
-    .manufacturer_len = 0, //TEST_MANUFACTURER_DATA_LEN,
-    .p_manufacturer_data =  NULL, //&test_manufacturer[0],
+    .manufacturer_len = MANUFACTURER_DATA_LEN,
+    .p_manufacturer_data =  &manufacturer_data[0],
     .service_data_len = 0,
     .p_service_data = NULL,
     .service_uuid_len = 32,
@@ -115,8 +117,8 @@ static esp_ble_adv_data_t scan_rsp_data = {
     .min_interval = 0x0006,
     .max_interval = 0x000C,
     .appearance = 0x00,
-    .manufacturer_len = 0, //TEST_MANUFACTURER_DATA_LEN,
-    .p_manufacturer_data =  NULL, //&test_manufacturer[0],
+    .manufacturer_len = MANUFACTURER_DATA_LEN,
+    .p_manufacturer_data =  &manufacturer_data[0],
     .service_data_len = 0,
     .p_service_data = NULL,
     .service_uuid_len = 32,
