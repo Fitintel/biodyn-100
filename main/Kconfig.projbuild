@@ -1,15 +1,8 @@
-menu "A2DP Example Configuration"
-    config EXAMPLE_SSP_ENABLED
-        bool "Secure Simple Pairing"
-        depends on BT_CLASSIC_ENABLED
-        default y
-        help
-            This enables the Secure Simple Pairing. If disable this option,
-            Bluedroid will only support Legacy Pairing
+menu "BIODYN-100 Config"
 
-    config EXAMPLE_PEER_DEVICE_NAME
-        string "Target Device Name"
-        default "ESP_SPEAKER"
+    config CONFIG_OPTION_EXAMPLE
+        bool "a short description" 
         help
-            Use this option to set target device name to connect.
+			a long description. config option is set as a macro to given value during compile.
 endmenu
+
