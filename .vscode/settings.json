@@ -6,5 +6,10 @@
         "board/esp32s3-builtin.cfg"
     ],
     "idf.port": "/dev/tty.usbmodem1101",
-    "idf.toolsPath": "/Users/callum/.espressif"
+	"idf.toolsPath": "/Users/callum/.espressif",
+	"files.associations": {
+		"esp_log.h": "c",
+		"esp_system.h": "c",
+		"stdint.h": "c"
+	}
 }
