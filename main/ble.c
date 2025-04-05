@@ -24,25 +24,42 @@
 #include "ble.h"
 #include "constants.h"
 
-#define BIODYN_GATTS_APP_ID 0
+// Profile identifiers (also known as 'applications')
+#define BIODYN_DEVICE_PROFILE_ID 0 // TODO: Implement me!
+#define BIODYN_SENSOR_PROFILE_ID 1 // TODO: Implement me!
 
 // Manufacturer data included in the BLE advertisement
 static uint8_t manufacturer_data = 0; // TODO: What should we put here?
 // Then data length in bytes for manufacturer data included in BLE advertisement
-// This CANNOT be larger than 31
+// This *CANNOT* be larger than 31 bytes
 #define BIODYN_MANUFACTURER_DATA_LEN sizeof(manufacturer_data)
 
 
 // BLE advertisement data configuration
 esp_ble_adv_data_t ble_advertisement_data = {
-	.set_scan_rsp = false, // Are we offering a scan response?
+	.set_scan_rsp = false, // This is not a scan response packet 
 	.include_name = true, // Include device name in advertisement
 	.include_txpower = true, // Include TX power in advertisement
 	.min_interval = 6, // Preffered connection minimum time interval
 	.max_interval = 12, // Preferred connection maximum time interval
-	.appearance = 0, // TODO: What is this?
+	.appearance = 0x090718, // Information about the device type (device class): ie. wearable etc
 	.manufacturer_len = BIODYN_MANUFACTURER_DATA_LEN, // See definition
 	.p_manufacturer_data = &manufacturer_data, // Pointer to manufacturer data
+
+	// TODO: We can advertise service data without a connection made.
+	// This could be useful for sharing some metrics between FITNET nodes directly
+	// since our BLE only has single-connection capability.
+	.service_data_len = 0,
+	.p_service_data = NULL,
+
+	// This is our service advertisement data. It is not crucial that this is
+	// here but it can give devices info on services provided. In context of the
+	// BIOHUB it doesn't matter all that much. TODO: What services should we advertise?
+	.service_uuid_len = 0, // We aren't providing any service data yet 
+	.p_service_uuid = NULL, // ^
+
+	// General discoverable mode + low-energy bluetooth only device
+	.flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT), 
 };
 
 // Initializes the BIODYN bluetooth low energy GATTS server and GAP protocols

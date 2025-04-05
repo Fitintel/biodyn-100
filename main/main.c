@@ -36,8 +36,6 @@
 #define SECOND_TO_USECOND 1000000
 
 static bool is_connect = false;
-/// Declare the static functior
-static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
 
 #define GATTS_SERVICE_UUID_TEST_A 0x00FF
 #define GATTS_CHAR_UUID_TEST_A 0xFF01
@@ -48,8 +46,6 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
 #define GATTS_CHAR_UUID_TEST_B 0xEE01
 #define GATTS_DESCR_UUID_TEST_B 0x2222
 #define GATTS_NUM_HANDLE_TEST_B 4
-
-#define DEVICE_NAME "BIODYN-100"
 
 #define GATTS_DEMO_CHAR_VAL_LEN_MAX 0x40
 
@@ -68,82 +64,6 @@ static esp_attr_value_t gatts_demo_char1_val =
 static uint8_t adv_config_done = 0;
 #define adv_config_flag (1 << 0)
 #define scan_rsp_config_flag (1 << 1)
-
-static uint8_t adv_service_uuid128[32] = {
-	/* LSB <--------------------------------------------------------------------------------> MSB */
-	// first uuid, 16bit, [12],[13] is the value
-	0xfb,
-	0x34,
-	0x9b,
-	0x5f,
-	0x80,
-	0x00,
-	0x00,
-	0x80,
-	0x00,
-	0x10,
-	0x00,
-	0x00,
-	0xEE,
-	0x00,
-	0x00,
-	0x00,
-	// second uuid, 32bit, [12], [13], [14], [15] is the value
-	0xfb,
-	0x34,
-	0x9b,
-	0x5f,
-	0x80,
-	0x00,
-	0x00,
-	0x80,
-	0x00,
-	0x10,
-	0x00,
-	0x00,
-	0xFF,
-	0x00,
-	0x00,
-	0x00,
-};
-
-// The length of adv data must be less than 31 bytes
-// TODO: Use this to differentiate device type
-#define MANUFACTURER_DATA_LEN 17
-static uint8_t manufacturer_data[MANUFACTURER_DATA_LEN] = {0x12, 0x23, 0x45, 0x56};
-
-// Advertising data
-static esp_ble_adv_data_t adv_data = {
-	.set_scan_rsp = false,
-	.include_name = true,
-	.include_txpower = true,
-	.min_interval = 0x0006, // slave connection min interval, Time = min_interval * 1.25 msec
-	.max_interval = 0x000C, // slave connection max interval, Time = max_interval * 1.25 msec
-	.appearance = 0x00,
-	.manufacturer_len = MANUFACTURER_DATA_LEN,
-	.p_manufacturer_data = &manufacturer_data[0],
-	.service_data_len = 0,
-	.p_service_data = NULL,
-	.service_uuid_len = 32,
-	.p_service_uuid = adv_service_uuid128,
-	.flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
-};
-// scan response data
-static esp_ble_adv_data_t scan_rsp_data = {
-	.set_scan_rsp = true,
-	.include_name = true,
-	.include_txpower = true,
-	.min_interval = 0x0006,
-	.max_interval = 0x000C,
-	.appearance = 0x00,
-	.manufacturer_len = MANUFACTURER_DATA_LEN,
-	.p_manufacturer_data = &manufacturer_data[0],
-	.service_data_len = 0,
-	.p_service_data = NULL,
-	.service_uuid_len = 32,
-	.p_service_uuid = adv_service_uuid128,
-	.flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
-};
 
 static esp_ble_adv_params_t adv_params = {
 	.adv_int_min = 0x20,
@@ -370,6 +290,8 @@ void app_main(void)
 {
 	esp_err_t ret;
 
+	ESP_LOGI(MAIN_TAG, "Starting %s", BIODYN_DEVICE_NAME);
+
 	// Initialize persistant storage (nvs)
 	if (biodyn_init_nvs())
 	{
@@ -385,4 +307,5 @@ void app_main(void)
 	}
 
 	// Set up!
+	ESP_LOGI(MAIN_TAG, "Finished setup");
 }

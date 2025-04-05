@@ -1,10 +1,12 @@
 #ifndef BIODYN_CONSTANTS_H
 #define BIODYN_CONSTANTS_H
 
+// Generic constants
 #define BIODYN_DEVICE_NAME "BIODYN-100"
 
 // LOG TAGS
 #define MAIN_TAG "MAIN"
 #define GATTS_TAG "GATTS"
+
 
 #endif // BIODYN_CONSTANTS_H
