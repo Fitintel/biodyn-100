@@ -65,17 +65,6 @@ static uint8_t adv_config_done = 0;
 #define adv_config_flag (1 << 0)
 #define scan_rsp_config_flag (1 << 1)
 
-static esp_ble_adv_params_t adv_params = {
-	.adv_int_min = 0x20,
-	.adv_int_max = 0x40,
-	.adv_type = ADV_TYPE_IND,
-	.own_addr_type = BLE_ADDR_TYPE_PUBLIC,
-	//.peer_addr            =
-	//.peer_addr_type       =
-	.channel_map = ADV_CHNL_ALL,
-	.adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
-};
-
 #define PROFILE_NUM 1
 #define PROFILE_A_APP_ID 0
 
@@ -134,120 +123,6 @@ static uint8_t check_sum(uint8_t *addr, uint16_t count)
 	}
 
 	return (uint8_t)~sum;
-}
-
-static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
-{
-	switch (event)
-	{
-	case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
-		adv_config_done &= (~adv_config_flag);
-		if (adv_config_done == 0)
-		{
-			esp_ble_gap_start_advertising(&adv_params);
-		}
-		break;
-	case ESP_GAP_BLE_SCAN_RSP_DATA_SET_COMPLETE_EVT:
-		adv_config_done &= (~scan_rsp_config_flag);
-		if (adv_config_done == 0)
-		{
-			esp_ble_gap_start_advertising(&adv_params);
-		}
-		break;
-	case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
-		// advertising start complete event to indicate advertising start successfully or failed
-		if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS)
-		{
-			ESP_LOGE(GATTS_TAG, "Advertising start failed");
-		}
-		break;
-	case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
-		if (param->adv_stop_cmpl.status != ESP_BT_STATUS_SUCCESS)
-		{
-			ESP_LOGE(GATTS_TAG, "Advertising stop failed");
-		}
-		else
-		{
-			ESP_LOGI(GATTS_TAG, "Stop adv successfully");
-		}
-		break;
-	case ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT:
-		ESP_LOGI(GATTS_TAG, "update connection params status = %d, min_int = %d, max_int = %d,conn_int = %d,latency = %d, timeout = %d",
-				 param->update_conn_params.status,
-				 param->update_conn_params.min_int,
-				 param->update_conn_params.max_int,
-				 param->update_conn_params.conn_int,
-				 param->update_conn_params.latency,
-				 param->update_conn_params.timeout);
-		break;
-	default:
-		break;
-	}
-}
-
-void example_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param)
-{
-	esp_gatt_status_t status = ESP_GATT_OK;
-	if (param->write.need_rsp)
-	{
-		if (param->write.is_prep)
-		{
-			if (param->write.offset > PREPARE_BUF_MAX_SIZE)
-			{
-				status = ESP_GATT_INVALID_OFFSET;
-			}
-			else if ((param->write.offset + param->write.len) > PREPARE_BUF_MAX_SIZE)
-			{
-				status = ESP_GATT_INVALID_ATTR_LEN;
-			}
-
-			if (status == ESP_GATT_OK && prepare_write_env->prepare_buf == NULL)
-			{
-				prepare_write_env->prepare_buf = (uint8_t *)malloc(PREPARE_BUF_MAX_SIZE * sizeof(uint8_t));
-				prepare_write_env->prepare_len = 0;
-				if (prepare_write_env->prepare_buf == NULL)
-				{
-					ESP_LOGE(GATTS_TAG, "Gatt_server prep no mem");
-					status = ESP_GATT_NO_RESOURCES;
-				}
-			}
-
-			esp_gatt_rsp_t *gatt_rsp = (esp_gatt_rsp_t *)malloc(sizeof(esp_gatt_rsp_t));
-			if (gatt_rsp)
-			{
-				gatt_rsp->attr_value.len = param->write.len;
-				gatt_rsp->attr_value.handle = param->write.handle;
-				gatt_rsp->attr_value.offset = param->write.offset;
-				gatt_rsp->attr_value.auth_req = ESP_GATT_AUTH_REQ_NONE;
-				memcpy(gatt_rsp->attr_value.value, param->write.value, param->write.len);
-				esp_err_t response_err = esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, status, gatt_rsp);
-
-				if (response_err != ESP_OK)
-				{
-					ESP_LOGE(GATTS_TAG, "Send response error\n");
-				}
-				free(gatt_rsp);
-			}
-			else
-			{
-				ESP_LOGE(GATTS_TAG, "malloc failed, no resource to send response error\n");
-				status = ESP_GATT_NO_RESOURCES;
-			}
-
-			if (status != ESP_GATT_OK)
-			{
-				return;
-			}
-			memcpy(prepare_write_env->prepare_buf + param->write.offset,
-				   param->write.value,
-				   param->write.len);
-			prepare_write_env->prepare_len += param->write.len;
-		}
-		else
-		{
-			esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, status, NULL);
-		}
-	}
 }
 
 void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param)

@@ -24,6 +24,13 @@
 #include "ble.h"
 #include "constants.h"
 
+// This is our bluetooth driver data.
+static struct
+{
+	bool has_connection; // Do we have an active connection to another device?
+	uint8_t error; // 0 if ok, otherwise has a BIODYN_BLE_ERR_ set 
+} biodyn_ble_data = { false };
+
 // Profile identifiers (also known as 'applications')
 #define BIODYN_DEVICE_PROFILE_ID 0 // TODO: Implement me!
 #define BIODYN_SENSOR_PROFILE_ID 1 // TODO: Implement me!
@@ -34,8 +41,8 @@ static uint8_t manufacturer_data = 0; // TODO: What should we put here?
 // This *CANNOT* be larger than 31 bytes
 #define BIODYN_MANUFACTURER_DATA_LEN sizeof(manufacturer_data)
 
-
-// BLE advertisement data configuration
+// BLE advertisement data packet configuration.
+// This configures the structure of our packets.
 esp_ble_adv_data_t ble_advertisement_data = {
 	.set_scan_rsp = false, // This is not a scan response packet 
 	.include_name = true, // Include device name in advertisement
@@ -46,21 +53,34 @@ esp_ble_adv_data_t ble_advertisement_data = {
 	.manufacturer_len = BIODYN_MANUFACTURER_DATA_LEN, // See definition
 	.p_manufacturer_data = &manufacturer_data, // Pointer to manufacturer data
 
-	// TODO: We can advertise service data without a connection made.
+	// TODO: We can advertise service data without a connection made. 
 	// This could be useful for sharing some metrics between FITNET nodes directly
 	// since our BLE only has single-connection capability.
 	.service_data_len = 0,
 	.p_service_data = NULL,
 
-	// This is our service advertisement data. It is not crucial that this is
+	// This says what services we have. It is not crucial that this is
 	// here but it can give devices info on services provided. In context of the
 	// BIOHUB it doesn't matter all that much. TODO: What services should we advertise?
-	.service_uuid_len = 0, // We aren't providing any service data yet 
+	.service_uuid_len = 0, // We aren't advertising any services yet 
 	.p_service_uuid = NULL, // ^
 
 	// General discoverable mode + low-energy bluetooth only device
 	.flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT), 
 };
+
+// BLE advertisement parameters. This configures how we advertise, not what.
+static esp_ble_adv_params_t ble_advertisement_params = {
+	// This is how frequently we send advertisment packets
+	.adv_int_min = 32, // Time = 32 * 0.625 ms = 20 ms
+	.adv_int_max = 64, // Time = 64 * 0.625 ms = 40 ms
+
+	.adv_type = ADV_TYPE_IND, // We're doing general advertisement
+	.own_addr_type = BLE_ADDR_TYPE_PUBLIC, // We have a public non-random BLE address
+	.channel_map = ADV_CHNL_ALL, // Advertise on all BLE channels
+	.adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY, // Allow any device to scan and connect
+};
+
 
 // Initializes the BIODYN bluetooth low energy GATTS server and GAP protocols
 // Returns non-zero value on error
@@ -139,31 +159,30 @@ esp_err_t biodyn_init_ble()
 // The GATTS server callback function
 void biodyn_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
+	// TODO: Refactor
 	switch (event)
 	{
-	case ESP_GATTS_REG_EVT:
-		ESP_LOGI(GATTS_TAG, "ESP_GATTS_REG_EVT, status %d, app_id %d", param->reg.status, param->reg.app_id);
+	case ESP_GATTS_REG_EVT: // Registering our server, let's provide some info.
+		ESP_LOGI(GATTS_TAG, "Server registration event: status %d, app_id %d", param->reg.status, param->reg.app_id);
 
 		// Set the device name
 		esp_err_t set_dev_name_ret = esp_ble_gap_set_device_name(BIODYN_DEVICE_NAME);
 		if (set_dev_name_ret)
-		{
-			ESP_LOGE(GATTS_TAG, "Failed to se device name to %s, error code = %x", BIODYN_DEVICE_NAME, set_dev_name_ret);
-		}
+			ESP_LOGE(GATTS_TAG, "Failed to set device name to %s, error code = %x", BIODYN_DEVICE_NAME, set_dev_name_ret);
+
 		// Configure advertisement data
 		esp_err_t ret = esp_ble_gap_config_adv_data(&ble_advertisement_data);
 		if (ret)
 		{
-			ESP_LOGE(GATTS_TAG, "config adv data failed, error code = %x", ret);
-		}
-		adv_config_done |= adv_config_flag;
-		// config scan response data
-		ret = esp_ble_gap_config_adv_data(&scan_rsp_data);
-		if (ret)
-		{
-			ESP_LOGE(GATTS_TAG, "config scan response data failed, error code = %x", ret);
-		}
-		adv_config_done |= scan_rsp_config_flag;
+			biodyn_ble_data.error |= BIODYN_BLE_ERR_ADV_DATA_INIT;
+			ESP_LOGE(GATTS_TAG, "Failed to configure advertisement packet data, error code = %x", ret);
+		} else biodyn_ble_data.error &= ~BIODYN_BLE_ERR_ADV_DATA_INIT;
+		// // Configure scan response data
+		// ret = esp_ble_gap_config_adv_data(&scan_rsp_data);
+		// if (ret)
+		//  // set not ok
+		// 	ESP_LOGE(GATTS_TAG, "config scan response data failed, error code = %x", ret);
+		// else // set ok
 		esp_ble_gatts_create_service(gatts_if, &gl_profile_tab[PROFILE_A_APP_ID].service_id, GATTS_NUM_HANDLE_TEST_A);
 		break;
 	case ESP_GATTS_READ_EVT:
@@ -191,9 +210,9 @@ void biodyn_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 		esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
 		example_exec_write_event_env(&a_prepare_write_env, param);
 		break;
-	case ESP_GATTS_MTU_EVT:
-		ESP_LOGI(GATTS_TAG, "ESP_GATTS_MTU_EVT, MTU %d", param->mtu.mtu);
-		is_connect = true;
+	case ESP_GATTS_MTU_EVT: // We have a connection
+		ESP_LOGI(GATTS_TAG, "MTU set complete: we have a connection. MTU %d", param->mtu.mtu);
+		biodyn_ble_data.has_connection = true;
 		break;
 	case ESP_GATTS_UNREG_EVT:
 		break;
@@ -268,10 +287,11 @@ void biodyn_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 		gl_profile_tab[PROFILE_A_APP_ID].conn_id = param->connect.conn_id;
 		break;
 	}
-	case ESP_GATTS_DISCONNECT_EVT:
-		is_connect = false;
-		ESP_LOGI(GATTS_TAG, "ESP_GATTS_DISCONNECT_EVT");
-		esp_ble_gap_start_advertising(&adv_params);
+	case ESP_GATTS_DISCONNECT_EVT: // We got disconnected from :(
+		ESP_LOGI(GATTS_TAG, "Device disconnected");
+	 	biodyn_ble_data.has_connection = false;
+		// Start advertising again
+		esp_ble_gap_start_advertising(&ble_advertisement_params);
 		break;
 	case ESP_GATTS_CONF_EVT:
 		break;
@@ -291,4 +311,114 @@ void biodyn_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 void biodyn_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
 	// TODO: Implement
+	switch (event)
+	{
+	case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+		adv_config_done &= (~adv_config_flag);
+		if (adv_config_done == 0)
+		{
+			esp_ble_gap_start_advertising(&adv_params);
+		}
+		break;
+	case ESP_GAP_BLE_SCAN_RSP_DATA_SET_COMPLETE_EVT:
+		adv_config_done &= (~scan_rsp_config_flag);
+		if (adv_config_done == 0)
+		{
+			esp_ble_gap_start_advertising(&adv_params);
+		}
+		break;
+	case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
+		// advertising start complete event to indicate advertising start successfully or failed
+		if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS)
+		{
+			ESP_LOGE(GATTS_TAG, "Advertising start failed");
+		}
+		break;
+	case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
+		if (param->adv_stop_cmpl.status != ESP_BT_STATUS_SUCCESS)
+		{
+			ESP_LOGE(GATTS_TAG, "Advertising stop failed");
+		}
+		else
+		{
+			ESP_LOGI(GATTS_TAG, "Stop adv successfully");
+		}
+		break;
+	case ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT:
+		ESP_LOGI(GATTS_TAG, "update connection params status = %d, min_int = %d, max_int = %d,conn_int = %d,latency = %d, timeout = %d",
+				 param->update_conn_params.status,
+				 param->update_conn_params.min_int,
+				 param->update_conn_params.max_int,
+				 param->update_conn_params.conn_int,
+				 param->update_conn_params.latency,
+				 param->update_conn_params.timeout);
+		break;
+	default:
+		break;
+	}
+}
+
+void example_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param)
+{
+	esp_gatt_status_t status = ESP_GATT_OK;
+	if (param->write.need_rsp)
+	{
+		if (param->write.is_prep)
+		{
+			if (param->write.offset > PREPARE_BUF_MAX_SIZE)
+			{
+				status = ESP_GATT_INVALID_OFFSET;
+			}
+			else if ((param->write.offset + param->write.len) > PREPARE_BUF_MAX_SIZE)
+			{
+				status = ESP_GATT_INVALID_ATTR_LEN;
+			}
+
+			if (status == ESP_GATT_OK && prepare_write_env->prepare_buf == NULL)
+			{
+				prepare_write_env->prepare_buf = (uint8_t *)malloc(PREPARE_BUF_MAX_SIZE * sizeof(uint8_t));
+				prepare_write_env->prepare_len = 0;
+				if (prepare_write_env->prepare_buf == NULL)
+				{
+					ESP_LOGE(GATTS_TAG, "Gatt_server prep no mem");
+					status = ESP_GATT_NO_RESOURCES;
+				}
+			}
+
+			esp_gatt_rsp_t *gatt_rsp = (esp_gatt_rsp_t *)malloc(sizeof(esp_gatt_rsp_t));
+			if (gatt_rsp)
+			{
+				gatt_rsp->attr_value.len = param->write.len;
+				gatt_rsp->attr_value.handle = param->write.handle;
+				gatt_rsp->attr_value.offset = param->write.offset;
+				gatt_rsp->attr_value.auth_req = ESP_GATT_AUTH_REQ_NONE;
+				memcpy(gatt_rsp->attr_value.value, param->write.value, param->write.len);
+				esp_err_t response_err = esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, status, gatt_rsp);
+
+				if (response_err != ESP_OK)
+				{
+					ESP_LOGE(GATTS_TAG, "Send response error\n");
+				}
+				free(gatt_rsp);
+			}
+			else
+			{
+				ESP_LOGE(GATTS_TAG, "malloc failed, no resource to send response error\n");
+				status = ESP_GATT_NO_RESOURCES;
+			}
+
+			if (status != ESP_GATT_OK)
+			{
+				return;
+			}
+			memcpy(prepare_write_env->prepare_buf + param->write.offset,
+				   param->write.value,
+				   param->write.len);
+			prepare_write_env->prepare_len += param->write.len;
+		}
+		else
+		{
+			esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, status, NULL);
+		}
+	}
 }
