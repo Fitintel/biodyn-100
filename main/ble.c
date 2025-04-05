@@ -26,6 +26,25 @@
 
 #define BIODYN_GATTS_APP_ID 0
 
+// Manufacturer data included in the BLE advertisement
+static uint8_t manufacturer_data = 0; // TODO: What should we put here?
+// Then data length in bytes for manufacturer data included in BLE advertisement
+// This CANNOT be larger than 31
+#define BIODYN_MANUFACTURER_DATA_LEN sizeof(manufacturer_data)
+
+
+// BLE advertisement data configuration
+esp_ble_adv_data_t ble_advertisement_data = {
+	.set_scan_rsp = false, // Are we offering a scan response?
+	.include_name = true, // Include device name in advertisement
+	.include_txpower = true, // Include TX power in advertisement
+	.min_interval = 6, // Preffered connection minimum time interval
+	.max_interval = 12, // Preferred connection maximum time interval
+	.appearance = 0, // TODO: What is this?
+	.manufacturer_len = BIODYN_MANUFACTURER_DATA_LEN, // See definition
+	.p_manufacturer_data = &manufacturer_data, // Pointer to manufacturer data
+};
+
 // Initializes the BIODYN bluetooth low energy GATTS server and GAP protocols
 // Returns non-zero value on error
 esp_err_t biodyn_init_ble()
@@ -115,7 +134,7 @@ void biodyn_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 			ESP_LOGE(GATTS_TAG, "Failed to se device name to %s, error code = %x", BIODYN_DEVICE_NAME, set_dev_name_ret);
 		}
 		// Configure advertisement data
-		esp_err_t ret = esp_ble_gap_config_adv_data(&adv_data);
+		esp_err_t ret = esp_ble_gap_config_adv_data(&ble_advertisement_data);
 		if (ret)
 		{
 			ESP_LOGE(GATTS_TAG, "config adv data failed, error code = %x", ret);
