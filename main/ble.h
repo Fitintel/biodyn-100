@@ -92,4 +92,8 @@ struct biodyn_ble_char_descriptor
 	esp_attr_value_t value;		 // The value associated with this descriptor
 };
 
+// Helper functions for setting up BLE schematics
+#define BIODYN_BLE_UUID_16(uuid_value) { .len = ESP_UUID_LEN_16, .uuid = { .uuid16 = uuid_value } }
+#define BIODYN_BLE_SERVICE_ID_16(uuid_value) { .id = { BIODYN_BLE_UUID_16(uuid_value), .inst_id = 0}, .is_primary = true }
+
 #endif // FITNET_BLE_H

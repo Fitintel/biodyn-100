@@ -2,7 +2,9 @@
 #define BIODYN_CONSTANTS_H
 
 // Generic constants
+#define BIODYN_MANUFACTURER_NAME "FITNET"
 #define BIODYN_DEVICE_NAME "BIODYN-100"
+#define BIODYN_FIRMWARE_VERSION "0.0.1"
 
 // LOG TAGS
 #define MAIN_TAG "MAIN"
