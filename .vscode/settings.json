@@ -10,6 +10,7 @@
 	"files.associations": {
 		"esp_log.h": "c",
 		"esp_system.h": "c",
-		"stdint.h": "c"
+		"stdint.h": "c",
+		"constants.h": "c"
 	}
 }

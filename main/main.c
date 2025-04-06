@@ -24,132 +24,11 @@
 #include "constants.h"
 #include "ble.h"
 
-/**********************************************************
- * Thread/Task reference
- **********************************************************/
-#ifdef CONFIG_BLUEDROID_PINNED_TO_CORE
-#define BLUETOOTH_TASK_PINNED_TO_CORE (CONFIG_BLUEDROID_PINNED_TO_CORE < CONFIG_FREERTOS_NUMBER_OF_CORES ? CONFIG_BLUEDROID_PINNED_TO_CORE : tskNO_AFFINITY)
-#else
-#define BLUETOOTH_TASK_PINNED_TO_CORE (0)
-#endif
-
-#define SECOND_TO_USECOND 1000000
-
-static bool is_connect = false;
-
-#define GATTS_SERVICE_UUID_TEST_A 0x00FF
-#define GATTS_CHAR_UUID_TEST_A 0xFF01
-#define GATTS_DESCR_UUID_TEST_A 0x3333
-#define GATTS_NUM_HANDLE_TEST_A 4
-
-#define GATTS_SERVICE_UUID_TEST_B 0x00EE
-#define GATTS_CHAR_UUID_TEST_B 0xEE01
-#define GATTS_DESCR_UUID_TEST_B 0x2222
-#define GATTS_NUM_HANDLE_TEST_B 4
-
-#define GATTS_DEMO_CHAR_VAL_LEN_MAX 0x40
-
-#define PREPARE_BUF_MAX_SIZE 1024
-
-static uint8_t char1_str[] = {0x11, 0x22, 0x33};
-static esp_gatt_char_prop_t a_property = 0;
-
-static esp_attr_value_t gatts_demo_char1_val =
-	{
-		.attr_max_len = GATTS_DEMO_CHAR_VAL_LEN_MAX,
-		.attr_len = sizeof(char1_str),
-		.attr_value = char1_str,
-};
-
-static uint8_t adv_config_done = 0;
-#define adv_config_flag (1 << 0)
-#define scan_rsp_config_flag (1 << 1)
-
-#define PROFILE_NUM 1
-#define PROFILE_A_APP_ID 0
-
-struct gatts_profile_inst
-{
-	esp_gatts_cb_t gatts_cb;
-	uint16_t gatts_if;
-	uint16_t app_id;
-	uint16_t conn_id;
-	uint16_t service_handle;
-	esp_gatt_srvc_id_t service_id;
-	uint16_t char_handle;
-	esp_bt_uuid_t char_uuid;
-	esp_gatt_perm_t perm;
-	esp_gatt_char_prop_t property;
-	uint16_t descr_handle;
-	esp_bt_uuid_t descr_uuid;
-};
-
-/* One gatt-based profile one app_id and one gatts_if, this array will store the gatts_if returned by ESP_GATTS_REG_EVT */
-static struct gatts_profile_inst gl_profile_tab[PROFILE_NUM] = {
-	[PROFILE_A_APP_ID] = {
-		.gatts_cb = gatts_profile_a_event_handler,
-		.gatts_if = ESP_GATT_IF_NONE, /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
-	},
-};
-
-typedef struct
-{
-	uint8_t *prepare_buf;
-	int prepare_len;
-} prepare_type_env_t;
-
-static prepare_type_env_t a_prepare_write_env;
-
-void example_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param);
-void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param);
-
-static uint8_t check_sum(uint8_t *addr, uint16_t count)
-{
-	uint32_t sum = 0;
-
-	if (addr == NULL || count == 0)
-	{
-		return 0;
-	}
-
-	for (int i = 0; i < count; i++)
-	{
-		sum = sum + addr[i];
-	}
-
-	while (sum >> 8)
-	{
-		sum = (sum & 0xff) + (sum >> 8);
-	}
-
-	return (uint8_t)~sum;
-}
-
-void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param)
-{
-	if (param->exec_write.exec_write_flag != ESP_GATT_PREP_WRITE_EXEC)
-	{
-		ESP_LOGI(GATTS_TAG, "ESP_GATT_PREP_WRITE_CANCEL");
-	}
-	if (prepare_write_env->prepare_buf)
-	{
-		free(prepare_write_env->prepare_buf);
-		prepare_write_env->prepare_buf = NULL;
-	}
-	prepare_write_env->prepare_len = 0;
-}
-
-static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
-{
-}
-
-
 // Initializes the non-volatile storage (aka persistant)
-esp_err_t biodyn_init_nvs()
+esp_err_t biodyn_nvs_init()
 {
-	esp_err_t ret;
 	// Initialize NVS (non-volatile storage)
-	ret = nvs_flash_init();
+	esp_err_t ret = nvs_flash_init();
 	if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
 	{
 		ESP_ERROR_CHECK(nvs_flash_erase());
@@ -159,25 +38,24 @@ esp_err_t biodyn_init_nvs()
 	return ret;
 }
 
-
 // APP ENTRY POINT
 void app_main(void)
 {
-	esp_err_t ret;
+	esp_err_t err;
 
 	ESP_LOGI(MAIN_TAG, "Starting %s", BIODYN_DEVICE_NAME);
 
 	// Initialize persistant storage (nvs)
-	if (biodyn_init_nvs())
+	if (err = biodyn_init_nvs())
 	{
-		ESP_LOGE(MAIN_TAG, "Failed to initialize non-volatile storage in %s", __func__);
+		ESP_LOGE(MAIN_TAG, "Failed to initialize non-volatile storage in %s, error code %x", __func__, err);
 		return;
 	}
 
 	// Initialize bluetooth
-	if (biodyn_init_ble())
+	if (err = biodyn_ble_init())
 	{
-		ESP_LOGE(MAIN_TAG, "Failed to initialize Bluetooth in %s", __func__);
+		ESP_LOGE(MAIN_TAG, "Failed to initialize Bluetooth in %s, err code %x", __func__, err);
 		return;
 	}
 
