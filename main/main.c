@@ -40,7 +40,7 @@ void app_main(void)
 	}
 
 	// Initialize bluetooth
-	if ((err = biodyn_ble_init(N_PROFILES, &profiles[0])))
+	if ((err = biodyn_ble_init(LEN_OF_STATIC_ARRAY(profiles), &profiles[0])))
 	{
 		ESP_LOGE(MAIN_TAG, "Failed to initialize Bluetooth in %s, err code %x", __func__, err);
 		return;

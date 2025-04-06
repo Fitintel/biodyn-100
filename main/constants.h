@@ -10,5 +10,7 @@
 #define MAIN_TAG "MAIN"
 #define BIODYN_BLE_TAG "BLE"
 
+// Utility defines
+#define LEN_OF_STATIC_ARRAY(static_array) (sizeof(static_array) / sizeof(static_array[0]))
 
 #endif // BIODYN_CONSTANTS_H

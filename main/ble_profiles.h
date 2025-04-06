@@ -26,19 +26,19 @@ static struct biodyn_ble_service device_services[] = {
 	{
 		.name = "Device Information Service",
 		.service_id = BIODYN_BLE_SERVICE_ID_16(0x180A),
-		.n_characteristics = 1,
+		.n_characteristics = LEN_OF_STATIC_ARRAY(device_info_chars),
 		.characteristics = &device_info_chars[0],
 	}
 };
-#define N_DEVICE_SERVICES (sizeof(device_services) / sizeof(struct biodyn_ble_service))
 static struct biodyn_ble_profile profiles[] = {
 	{
 		.name = "Device Profile",
-		.n_services = N_DEVICE_SERVICES,
+		.n_services = LEN_OF_STATIC_ARRAY(device_services),
 		.services = &device_services[0],
 	}
 };
-#define N_PROFILES (sizeof(profiles) / sizeof(struct biodyn_ble_profile))
+
+
 
 
 #endif // BIODYN_BLE_PROFILES_H
