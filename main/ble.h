@@ -57,19 +57,26 @@ struct biodyn_ble_service
 // A BIODYN BLE characteristic schematic
 struct biodyn_ble_characteristic
 {
-	const char *name;	// The name for the characteristic
-	esp_bt_uuid_t uuid; // The UUID for the characteristic
+	const char *name;	// The name for the characteristic - REQUIRED
+	esp_bt_uuid_t uuid; // The UUID for the characteristic - REQUIRED
 
 	// The associated permissions. What is required for the properties to be accessed.
+	// The actual GATTS permissions. We will fail accessing the attribute if proper perms not set.
 	// Ex. normal read, requires encryption, requires authentication
+	// REQUIRED
 	esp_gatt_perm_t permissions;
 
-	// Characteristic properties: what can be done with this characteristic
+	// Characteristic properties: what can be done with this characteristic.
+	// This is what we tell the client, not what our internal GATTS permissions are.
 	// Ex. this characteristic can be read, written to, notify the client, etc
+	// REQUIRED
 	esp_gatt_char_prop_t properties;
 
 	uint16_t n_descriptors;							// The number of descriptors on this characteristic
 	struct biodyn_ble_char_descriptor *descriptors; // Descriptors for this characteristic
+
+	void *initial_value;		// The value this characteristic is initialized with
+	uint16_t intial_value_size; // The size of this initial value in bytes
 
 	// TODO: Add callback when characteristic is completely set up
 };

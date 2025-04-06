@@ -120,6 +120,8 @@ struct biodyn_ble_characteristic_data
 	uint16_t attribute_handle;								   // Handle from the GATTS pointing to our characteristic's value (ie. attribute)
 	struct biodyn_ble_service_data *service;				   // This characteristic's parent service
 
+	esp_attr_value_t initial_value; // The initial value associated with this descriptor
+
 	// TODO: How do we provide a nice interface to register characteristic info and callbacks?
 };
 
@@ -394,16 +396,22 @@ esp_err_t biodyn_ble_init_service(struct gatts_create_evt_param *cep)
 	// Ok, we started it successfully
 	service->service_state = biodyn_ble_service_started;
 
+	ESP_LOGI(BIODYN_BLE_TAG, "Started service \"%s\" successfully, adding %d characteristic(s)",
+			 service->name, service->n_characteristics);
+
 	// Time to add characteristics
 	for (int i = 0; i < service->n_characteristics; ++i)
 	{
 		struct biodyn_ble_characteristic_data *characteristic = &service->characteristics[i];
-		// Create the characteristic with no initial value
+		// Create the characteristic
 		esp_err_t add_char_ret = esp_ble_gatts_add_char(service->service_handle,
 														&characteristic->uuid,
 														characteristic->permissions,
 														characteristic->properties,
-														NULL, NULL);
+														characteristic->initial_value.attr_max_len == 0
+															? NULL
+															: &characteristic->initial_value,
+														NULL);
 		if (add_char_ret)
 		{
 			// Failed to add characteristic
@@ -636,10 +644,16 @@ void biodyn_ble_load_schematic(uint16_t n_profiles, struct biodyn_ble_profile *p
 				chr->permissions = chr_schematic->permissions;
 				chr->properties = chr_schematic->properties;
 				chr->characteristic_state = biodyn_ble_characteristic_not_created;
-				chr->service = service; // Set parent
+				// Add 1 for the characteristic, 1 for the value, and 1 for each descriptor
+				service->n_handles += 2 + chr_schematic->n_descriptors; 
+				chr->service = service;									// Set parent
+				// Set the intiial value
+				chr->initial_value.attr_len = chr_schematic->intial_value_size;
+				chr->initial_value.attr_max_len = chr_schematic->intial_value_size;
+				chr->initial_value.attr_value = chr_schematic->initial_value;
+				// Setup descriptors
 				chr->n_descriptors = chr_schematic->n_descriptors;
 				chr->descriptors = malloc(sizeof(struct biodyn_ble_char_descr_data) * chr->n_descriptors);
-				service->n_handles += 1 + chr_schematic->n_descriptors; // One more for the characteristic and each descriptor
 
 				for (int l = 0; l < chr->n_descriptors; ++l)
 				{
@@ -649,6 +663,10 @@ void biodyn_ble_load_schematic(uint16_t n_profiles, struct biodyn_ble_profile *p
 					descr->permissions = descr_schematic->permissions;
 					descr->value = descr_schematic->value;
 					descr->descriptor_handle = 0; // We dont have one yet
+					
+					// Add a handle if our descriptor has a value
+					if (descr->value.attr_max_len != 0)
+						chr->n_descriptors++;
 				}
 			}
 		}
