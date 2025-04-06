@@ -119,8 +119,8 @@ struct biodyn_ble_characteristic_data
 	struct biodyn_ble_char_descr_data *descriptors;			   // Descriptor array for this characteristic
 	uint16_t attribute_handle;								   // Handle from the GATTS pointing to our characteristic's value (ie. attribute)
 	struct biodyn_ble_service_data *service;				   // This characteristic's parent service
-
-	esp_attr_value_t initial_value; // The initial value associated with this descriptor
+	esp_attr_value_t initial_value;							   // The initial value associated with this descriptor
+	esp_attr_control_t response_type;						   // Auto-response with GATT or app-controlled
 
 	// TODO: How do we provide a nice interface to register characteristic info and callbacks?
 };
@@ -224,6 +224,19 @@ struct biodyn_ble_characteristic_data *get_characteristic_from_id(uint16_t servi
 	}
 
 	// Not found
+	return NULL;
+}
+
+// Returns the characteristic data for the characteristic with the given handle
+struct biodyn_ble_characteristic_data *get_characteristic_from_handle(uint16_t handle)
+{
+	// Search everything
+	for (int i = 0; i < biodyn_ble_data.n_profiles; ++i)
+		for (int j = 0; j < biodyn_ble_data.profiles[i].n_services; ++j)
+			for (int k = 0; k < biodyn_ble_data.profiles[i].services[j].n_characteristics; ++k)
+				if (biodyn_ble_data.profiles[i].services[j].characteristics[k].attribute_handle == handle)
+					return &biodyn_ble_data.profiles[i].services[j].characteristics[k];
+	// We didn't find it
 	return NULL;
 }
 
@@ -411,7 +424,7 @@ esp_err_t biodyn_ble_init_service(struct gatts_create_evt_param *cep)
 														characteristic->initial_value.attr_max_len == 0
 															? NULL
 															: &characteristic->initial_value,
-														NULL);
+														&characteristic->response_type);
 		if (add_char_ret)
 		{
 			// Failed to add characteristic
@@ -473,6 +486,26 @@ esp_err_t biodyn_ble_init_characterisic(struct gatts_add_char_evt_param *acep)
 	return 0;
 }
 
+// Handles a ble gatts read event
+void biodyn_ble_handle_read(struct gatts_read_evt_param *re)
+{
+	// Get the characteristic trying to be read
+	struct biodyn_ble_characteristic_data *chr = get_characteristic_from_handle(re->handle);
+	if (!chr)
+	{
+		ESP_LOGE(BIODYN_BLE_TAG, "Couldn't find characteristic with handle %d", re->handle);
+		biodyn_ble_data.error |= BIODYN_BLE_ERR_CANT_FIND_CHAR;
+		return;
+	}
+
+	ESP_LOGD(BIODYN_BLE_TAG, "Read request for characteristic \"%s\" in service \"%s\"", chr->name, chr->service->name);
+
+	// Form a response
+	// esp_gatt_rsp_t resp;
+	// resp.attr_value.handle = re->handle;
+	// TODO: This
+}
+
 // The global gatts server event handler function
 void biodyn_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
@@ -485,7 +518,7 @@ void biodyn_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 	case ESP_GATTS_READ_EVT:
 	{
 		ESP_LOGI(BIODYN_BLE_TAG, "ESP_GATTS_READ_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d", param->read.conn_id, param->read.trans_id, param->read.handle);
-		// TODO: Implement read event
+		biodyn_ble_handle_read(&param->read);
 		break;
 	}
 	case ESP_GATTS_WRITE_EVT:
@@ -645,12 +678,13 @@ void biodyn_ble_load_schematic(uint16_t n_profiles, struct biodyn_ble_profile *p
 				chr->properties = chr_schematic->properties;
 				chr->characteristic_state = biodyn_ble_characteristic_not_created;
 				// Add 1 for the characteristic, 1 for the value, and 1 for each descriptor
-				service->n_handles += 2 + chr_schematic->n_descriptors; 
-				chr->service = service;									// Set parent
-				// Set the intiial value
+				service->n_handles += 2 + chr_schematic->n_descriptors;
+				chr->service = service; // Set parent
+				// Set the initial value
 				chr->initial_value.attr_len = chr_schematic->intial_value_size;
 				chr->initial_value.attr_max_len = chr_schematic->intial_value_size;
 				chr->initial_value.attr_value = chr_schematic->initial_value;
+				chr->response_type.auto_rsp = chr_schematic->intial_value_size == 0 ? ESP_GATT_RSP_BY_APP : ESP_GATT_AUTO_RSP;
 				// Setup descriptors
 				chr->n_descriptors = chr_schematic->n_descriptors;
 				chr->descriptors = malloc(sizeof(struct biodyn_ble_char_descr_data) * chr->n_descriptors);
@@ -663,7 +697,7 @@ void biodyn_ble_load_schematic(uint16_t n_profiles, struct biodyn_ble_profile *p
 					descr->permissions = descr_schematic->permissions;
 					descr->value = descr_schematic->value;
 					descr->descriptor_handle = 0; // We dont have one yet
-					
+
 					// Add a handle if our descriptor has a value
 					if (descr->value.attr_max_len != 0)
 						chr->n_descriptors++;

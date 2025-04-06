@@ -75,7 +75,10 @@ struct biodyn_ble_characteristic
 	uint16_t n_descriptors;							// The number of descriptors on this characteristic
 	struct biodyn_ble_char_descriptor *descriptors; // Descriptors for this characteristic
 
-	void *initial_value;		// The value this characteristic is initialized with
+	// The value this characteristic is initialized with
+	// If a characteristic has an initial value, reading/writing will be automatically handled
+	// by the GATTS.
+	void *initial_value;
 	uint16_t intial_value_size; // The size of this initial value in bytes
 
 	// TODO: Add callback when characteristic is completely set up

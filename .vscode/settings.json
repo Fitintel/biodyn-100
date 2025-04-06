@@ -13,5 +13,6 @@
 		"stdint.h": "c",
 		"constants.h": "c",
 		"format": "c"
-	}
+	},
+	"idf.flashType": "JTAG"
 }
