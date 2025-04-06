@@ -39,6 +39,8 @@ struct biodyn_ble_profile
 	const char *name;					 // The name of this profile
 	uint16_t n_services;				 // The number of services for this profile
 	struct biodyn_ble_service *services; // The list of services for this profile
+
+	// TODO: Add callback when profile is completely set up
 };
 
 // A BIODYN BLE service schematic
@@ -48,6 +50,8 @@ struct biodyn_ble_service
 	esp_gatt_srvc_id_t service_id;					   // The GATTS service ID
 	uint16_t n_characteristics;						   // The number of characteristics this service has
 	struct biodyn_ble_characteristic *characteristics; // The list of characteristics
+
+	// TODO: Add callback when service is completely set up
 };
 
 // A BIODYN BLE characteristic schematic
@@ -66,6 +70,8 @@ struct biodyn_ble_characteristic
 
 	uint16_t n_descriptors;							// The number of descriptors on this characteristic
 	struct biodyn_ble_char_descriptor *descriptors; // Descriptors for this characteristic
+
+	// TODO: Add callback when characteristic is completely set up
 };
 
 // A BIODYN BLE characteristic descriptor schematic
