@@ -6,7 +6,7 @@
 
 // LOG TAGS
 #define MAIN_TAG "MAIN"
-#define GATTS_TAG "GATTS"
+#define BIODYN_BLE_TAG "BLE"
 
 
 #endif // BIODYN_CONSTANTS_H
