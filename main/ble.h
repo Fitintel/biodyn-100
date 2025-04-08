@@ -81,6 +81,10 @@ struct biodyn_ble_characteristic
 	void *initial_value;
 	uint16_t intial_value_size; // The size of this initial value in bytes
 
+	// Writes data to the output buffer. Size must be less than MTU (517).
+	// This is not called if there is an initial value for this characteristic
+	void (*get_data)(uint16_t *size, void *out);
+
 	// TODO: Add callback when characteristic is completely set up
 };
 
@@ -93,7 +97,11 @@ struct biodyn_ble_char_descriptor
 };
 
 // Helper functions for setting up BLE schematics
-#define BIODYN_BLE_UUID_16(uuid_value) { .len = ESP_UUID_LEN_16, .uuid = { .uuid16 = uuid_value } }
-#define BIODYN_BLE_SERVICE_ID_16(uuid_value) { .id = { BIODYN_BLE_UUID_16(uuid_value), .inst_id = 0}, .is_primary = true }
+#define BIODYN_BLE_UUID_16(uuid_value)                          \
+	{                                                           \
+		.len = ESP_UUID_LEN_16, .uuid = {.uuid16 = uuid_value } \
+	}
+
+#define BIODYN_BLE_SERVICE_ID_16(uuid_value) {.id = {BIODYN_BLE_UUID_16(uuid_value), .inst_id = 0}, .is_primary = true}
 
 #endif // FITNET_BLE_H

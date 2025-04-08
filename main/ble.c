@@ -28,6 +28,12 @@
 		Data definitions
    ---------------------------- */
 
+// Our app id
+#define BIODYN_GATTS_APP_ID 0
+
+// Our MTU
+#define BIODYN_BLE_MTU 517
+
 struct biodyn_ble_profile_data;
 struct biodyn_ble_service_data;
 struct biodyn_ble_characteristic_data;
@@ -53,9 +59,6 @@ enum biodyn_ble_characteristic_state
 	biodyn_ble_characteristic_failed,
 };
 
-// Our app id
-#define BIODYN_GATTS_APP_ID 0
-
 // This is our general bluetooth driver data.
 static struct
 {
@@ -64,7 +67,8 @@ static struct
 	biodyn_ble_err_t error;					  // 0 if ok, otherwise has a BIODYN_BLE_ERR_ set
 	uint16_t n_profiles;					  // The number of profiles we have
 	struct biodyn_ble_profile_data *profiles; // The BLE profiles we have
-} biodyn_ble_data = {false, 0, 0, 0, NULL};
+	uint8_t manufacturer_data;				  // Our manufacturer data for adv packets
+} biodyn_ble_data = {false, 0, 0, 0, NULL, 0};
 
 // Returns any accumulated errors in the biodyn bluetooth driver
 biodyn_ble_err_t biodyn_ble_get_err()
@@ -121,6 +125,7 @@ struct biodyn_ble_characteristic_data
 	struct biodyn_ble_service_data *service;				   // This characteristic's parent service
 	esp_attr_value_t initial_value;							   // The initial value associated with this descriptor
 	esp_attr_control_t response_type;						   // Auto-response with GATT or app-controlled
+	void (*get_data_fn)(uint16_t *size, void *dst);			   // Function called when a read is done and we aren't doing GATT auto-response
 
 	// TODO: How do we provide a nice interface to register characteristic info and callbacks?
 };
@@ -232,31 +237,38 @@ struct biodyn_ble_characteristic_data *get_characteristic_from_handle(uint16_t h
 {
 	// Search everything
 	for (int i = 0; i < biodyn_ble_data.n_profiles; ++i)
-		for (int j = 0; j < biodyn_ble_data.profiles[i].n_services; ++j)
-			for (int k = 0; k < biodyn_ble_data.profiles[i].services[j].n_characteristics; ++k)
-				if (biodyn_ble_data.profiles[i].services[j].characteristics[k].attribute_handle == handle)
-					return &biodyn_ble_data.profiles[i].services[j].characteristics[k];
+	{
+		struct biodyn_ble_profile_data *profile = &biodyn_ble_data.profiles[i];
+		for (int j = 0; j < profile->n_services; ++j)
+		{
+			struct biodyn_ble_service_data *service = &profile->services[j];
+			for (int k = 0; k < service->n_characteristics; ++k)
+			{
+				struct biodyn_ble_characteristic_data *chr = &service->characteristics[k];
+				if (chr->attribute_handle == handle)
+					return chr;
+			}
+		}
+	}
 	// We didn't find it
 	return NULL;
 }
 
-// Manufacturer data included in the BLE advertisement
-static uint8_t manufacturer_data = 0; // TODO: What should we put here?
 // Then data length in bytes for manufacturer data included in BLE advertisement
 // This *CANNOT* be larger than 31 bytes
-#define BIODYN_MANUFACTURER_DATA_LEN sizeof(manufacturer_data)
+#define BIODYN_MANUFACTURER_DATA_LEN sizeof(biodyn_ble_data.manufacturer_data)
 
 // BLE advertisement data packet configuration.
 // This configures the structure of our packets.
 esp_ble_adv_data_t biodyn_ble_advertisement_data = {
-	.set_scan_rsp = false,							  // This is not a scan response packet
-	.include_name = true,							  // Include device name in advertisement
-	.include_txpower = true,						  // Include TX power in advertisement
-	.min_interval = 6,								  // Preffered connection minimum time interval
-	.max_interval = 12,								  // Preferred connection maximum time interval
-	.appearance = 0x090718,							  // Information about the device type (device class): ie. wearable etc
-	.manufacturer_len = BIODYN_MANUFACTURER_DATA_LEN, // See definition
-	.p_manufacturer_data = &manufacturer_data,		  // Pointer to manufacturer data
+	.set_scan_rsp = false,									   // This is not a scan response packet
+	.include_name = true,									   // Include device name in advertisement
+	.include_txpower = true,								   // Include TX power in advertisement
+	.min_interval = 6,										   // Preffered connection minimum time interval
+	.max_interval = 12,										   // Preferred connection maximum time interval
+	.appearance = 0x090718,									   // Information about the device type (device class): ie. wearable etc
+	.manufacturer_len = BIODYN_MANUFACTURER_DATA_LEN,		   // See definition
+	.p_manufacturer_data = &biodyn_ble_data.manufacturer_data, // Pointer to manufacturer data
 
 	// TODO: We can advertise service data without a connection made.
 	// This could be useful for sharing some metrics between FITNET nodes directly
@@ -498,12 +510,33 @@ void biodyn_ble_handle_read(struct gatts_read_evt_param *re)
 		return;
 	}
 
-	ESP_LOGD(BIODYN_BLE_TAG, "Read request for characteristic \"%s\" in service \"%s\"", chr->name, chr->service->name);
+	// If it's auto-handled we ignore it
+	if (chr->response_type.auto_rsp == ESP_GATT_AUTO_RSP)
+		return;
+
+	ESP_LOGI(BIODYN_BLE_TAG, "Read request for characteristic \"%s\" in service \"%s\"", chr->name, chr->service->name);
+
+	// Get the data from the characteristic
+	if (!chr->get_data_fn)
+	{
+		ESP_LOGE(BIODYN_BLE_TAG, "Attempted to read characteristic \"%s\" but there was no get_data function", chr->name);
+		biodyn_ble_data.error |= BIODYN_BLE_ERR_CHARS_MISCONFIGURED;
+		return;
+	}
+	uint16_t data_len = 0;
+	uint8_t buf[BIODYN_BLE_MTU];
+	chr->get_data_fn(&data_len, &buf);
+
+	// TODO: Check we aren't using too much data
 
 	// Form a response
-	// esp_gatt_rsp_t resp;
-	// resp.attr_value.handle = re->handle;
-	// TODO: This
+	esp_gatt_rsp_t resp;
+	resp.attr_value.handle = re->handle;
+	resp.attr_value.len = data_len;
+	memcpy(resp.attr_value.value, &buf, data_len);
+
+	// Send the response
+	esp_ble_gatts_send_response(chr->service->profile->gatts_if, re->conn_id, re->trans_id, ESP_GATT_OK, &resp);
 }
 
 // The global gatts server event handler function
@@ -685,6 +718,7 @@ void biodyn_ble_load_schematic(uint16_t n_profiles, struct biodyn_ble_profile *p
 				chr->initial_value.attr_max_len = chr_schematic->intial_value_size;
 				chr->initial_value.attr_value = chr_schematic->initial_value;
 				chr->response_type.auto_rsp = chr_schematic->intial_value_size == 0 ? ESP_GATT_RSP_BY_APP : ESP_GATT_AUTO_RSP;
+				chr->get_data_fn = chr_schematic->get_data;
 				// Setup descriptors
 				chr->n_descriptors = chr_schematic->n_descriptors;
 				chr->descriptors = malloc(sizeof(struct biodyn_ble_char_descr_data) * chr->n_descriptors);
