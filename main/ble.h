@@ -29,6 +29,7 @@ typedef uint16_t biodyn_ble_err_t;
 #define BIODYN_BLE_ERR_CANT_CREATE_DESCR 0x100	 // Couldn't create a descriptor
 #define BIODYN_BLE_ERR_CANT_ADVERTISE 0x200		 // Couldn't start advertising
 #define BIODYN_BLE_ERR_CANT_STOP_ADVERTISE 0x400 // Couldn't stop advertising
+#define BIODYN_BLE_ERR_CANT_ADV_SERVICE 0x800	 // Couldn't advertise service
 
 // Returns any accumulated errors in the BIODYN BLE driver
 biodyn_ble_err_t biodyn_ble_get_err();
@@ -50,6 +51,7 @@ struct biodyn_ble_service
 	esp_gatt_srvc_id_t service_id;					   // The GATTS service ID
 	uint16_t n_characteristics;						   // The number of characteristics this service has
 	struct biodyn_ble_characteristic *characteristics; // The list of characteristics
+	bool advertise;									   // Whether to put this service in advertisment packets or not
 
 	// TODO: Add callback when service is completely set up
 };

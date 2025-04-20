@@ -67,8 +67,9 @@ static struct
 	biodyn_ble_err_t error;					  // 0 if ok, otherwise has a BIODYN_BLE_ERR_ set
 	uint16_t n_profiles;					  // The number of profiles we have
 	struct biodyn_ble_profile_data *profiles; // The BLE profiles we have
-	uint8_t manufacturer_data;				  // Our manufacturer data for adv packets
-} biodyn_ble_data = {false, 0, 0, 0, NULL, 0};
+	uint8_t manufacturer_data[4];			  // Our manufacturer data for adv packets
+	uint16_t advertisement_uuid_size;		  // How big the UUIDs are that we're putting in adv packets (16,32,128) 0 if unset
+} biodyn_ble_data = {false, 0, 0, 0, NULL, {0xF1, 0x72, 0xE7, 0x00}, 0};
 
 // Returns any accumulated errors in the biodyn bluetooth driver
 biodyn_ble_err_t biodyn_ble_get_err()
@@ -102,6 +103,7 @@ struct biodyn_ble_service_data
 	uint16_t service_handle;					 // The service handle. This is assiged when created, no need to be initialized.
 	esp_gatt_srvc_id_t service_id;				 // The GATT service identifier
 	struct biodyn_ble_profile_data *profile;	 // This service's parent profile
+	bool advertise;								 // Whether to advertise this service or not
 };
 
 // Represents a characteristic under a service
@@ -268,7 +270,7 @@ esp_ble_adv_data_t biodyn_ble_advertisement_data = {
 	.max_interval = 12,										   // Preferred connection maximum time interval
 	.appearance = 0x090718,									   // Information about the device type (device class): ie. wearable etc
 	.manufacturer_len = BIODYN_MANUFACTURER_DATA_LEN,		   // See definition
-	.p_manufacturer_data = &biodyn_ble_data.manufacturer_data, // Pointer to manufacturer data
+	.p_manufacturer_data = &biodyn_ble_data.manufacturer_data[0], // Pointer to manufacturer data
 
 	// TODO: We can advertise service data without a connection made.
 	// This could be useful for sharing some metrics between FITNET nodes directly
@@ -364,6 +366,10 @@ esp_err_t biodyn_ble_init_gatts(esp_gatt_if_t gatts_if)
 		biodyn_ble_data.error &= ~BIODYN_BLE_ERR_CANT_NAME;
 	}
 
+	// Create our services for our profiles
+	if ((err = biodyn_ble_init_profiles(gatts_if)))
+		ESP_LOGE(BIODYN_BLE_TAG, "Failed to create one or more BLE services!");
+
 	// Configure advertisement data
 	if ((err = esp_ble_gap_config_adv_data(&biodyn_ble_advertisement_data)))
 	{
@@ -372,13 +378,12 @@ esp_err_t biodyn_ble_init_gatts(esp_gatt_if_t gatts_if)
 	}
 	else
 	{
-		ESP_LOGD(BIODYN_BLE_TAG, "Set advertisement data");
+		ESP_LOGI(BIODYN_BLE_TAG, "Set advertisement data (%d service UUIDs in packet, len %d)",
+				 biodyn_ble_data.advertisement_uuid_size == 0 ? 0 : (biodyn_ble_advertisement_data.service_uuid_len / biodyn_ble_data.advertisement_uuid_size),
+				 biodyn_ble_data.advertisement_uuid_size);
 		biodyn_ble_data.error &= ~BIODYN_BLE_ERR_ADV_DATA_INIT;
 	}
 
-	// Create our services for our profiles
-	if ((err = biodyn_ble_init_profiles(gatts_if)))
-		ESP_LOGE(BIODYN_BLE_TAG, "Failed to create one or more BLE services!");
 	return err;
 }
 
@@ -545,43 +550,59 @@ void biodyn_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 	switch (event)
 	{
 	case ESP_GATTS_REG_EVT: // Registering our server, let's provide some info.
+#ifdef LOG_GATTS
 		ESP_LOGD(BIODYN_BLE_TAG, "ESP_GATTS_REG_EVT: status %d, app id %d", param->reg.status, param->reg.app_id);
+#endif // LOG_GATTS
 		biodyn_ble_init_gatts(gatts_if);
 		break;
 	case ESP_GATTS_READ_EVT:
 	{
+#ifdef LOG_GATTS
 		ESP_LOGI(BIODYN_BLE_TAG, "ESP_GATTS_READ_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d", param->read.conn_id, param->read.trans_id, param->read.handle);
+#endif // LOG_GATTS
 		biodyn_ble_handle_read(&param->read);
 		break;
 	}
 	case ESP_GATTS_WRITE_EVT:
 	{
+#ifdef LOG_GATTS
 		ESP_LOGI(BIODYN_BLE_TAG, "ESP_GATTS_WRITE_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d", param->read.conn_id, param->read.trans_id, param->read.handle);
-		// TODO: Implement write event
+#endif // LOG_GATTS
+	   // TODO: Implement write event
 		break;
 	}
 	case ESP_GATTS_EXEC_WRITE_EVT:
+#ifdef LOG_GATTS
 		ESP_LOGI(BIODYN_BLE_TAG, "ESP_GATTS_EXEC_WRITE_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d", param->read.conn_id, param->read.trans_id, param->read.handle);
-		// TODO: Implement execute write event
+#endif // LOG_GATTS
+	   // TODO: Implement execute write event
 		break;
 	case ESP_GATTS_MTU_EVT: // We have a connection: MTU has been negotiated
+#ifdef LOG_GATTS
 		ESP_LOGI(BIODYN_BLE_TAG, "ESP_GATTS_MTU_EVT: Connection made, MTU negotiated as %d", param->mtu.mtu);
+#endif // LOG_GATTS
 		biodyn_ble_data.has_connection = true;
 		break;
 	case ESP_GATTS_CREATE_EVT: // Our service is created, time to add characteristics and start the service
+#ifdef LOG_GATTS
 		ESP_LOGI(BIODYN_BLE_TAG, "ESP_GATTS_CREATE_EVT, status %d,  service_handle %d", param->create.status, param->create.service_handle);
+#endif // LOG_GATTS
 		biodyn_ble_init_service(&param->create);
 		break;
 	case ESP_GATTS_ADD_CHAR_EVT:
 	{
+#ifdef LOG_GATTS
 		ESP_LOGI(BIODYN_BLE_TAG, "ADD_CHAR_EVT, status %d,  attr_handle %d, service_handle %d",
 				 param->add_char.status, param->add_char.attr_handle, param->add_char.service_handle);
+#endif // LOG_GATTS
 		biodyn_ble_init_characterisic(&param->add_char);
 		break;
 	}
 	case ESP_GATTS_ADD_CHAR_DESCR_EVT: // Called when a descriptor attribute handle is ready
+#ifdef LOG_GATTS
 		ESP_LOGI(BIODYN_BLE_TAG, "ADD_DESCR_EVT, status %d, attr_handle %d, service_handle %d",
 				 param->add_char_descr.status, param->add_char_descr.attr_handle, param->add_char_descr.service_handle);
+#endif // LOG_GATTS
 		struct biodyn_ble_characteristic_data *chr = get_characteristic_from_id(param->add_char_descr.service_handle,
 																				&param->add_char_descr.descr_uuid);
 		if (!chr)
@@ -593,15 +614,19 @@ void biodyn_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 		chr->attribute_handle = param->add_char_descr.attr_handle;
 		break;
 	case ESP_GATTS_START_EVT:
+#ifdef LOG_GATTS
 		ESP_LOGI(BIODYN_BLE_TAG, "SERVICE_START_EVT, status %d, service_handle %d",
 				 param->start.status, param->start.service_handle);
+#endif // LOG_GATTS
 		break;
 	case ESP_GATTS_CONNECT_EVT:
 	{
+#ifdef LOG_GATTS
 		ESP_LOGI(BIODYN_BLE_TAG, "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:",
 				 param->connect.conn_id,
 				 param->connect.remote_bda[0], param->connect.remote_bda[1], param->connect.remote_bda[2],
 				 param->connect.remote_bda[3], param->connect.remote_bda[4], param->connect.remote_bda[5]);
+#endif // LOG_GATTS
 		biodyn_ble_data.connection_id = param->connect.conn_id;
 		break;
 	}
@@ -697,8 +722,50 @@ void biodyn_ble_load_schematic(uint16_t n_profiles, struct biodyn_ble_profile *p
 			service->service_state = biodyn_ble_service_not_created;
 			service->service_handle = 0; // We haven't been assigned one yet
 			service->service_id = service_schematic->service_id;
-			service->n_handles = 1;		// Start with 1 for the service itself
-			service->profile = profile; // Set parent
+			service->n_handles = 1;							   // Start with 1 for the service itself
+			service->profile = profile;						   // Set parent
+			service->advertise = service_schematic->advertise; // Set advertise or not
+
+			// Add to advertisement data if we want to
+			if (service->advertise)
+			{
+				if (service->service_id.id.uuid.len != biodyn_ble_data.advertisement_uuid_size && biodyn_ble_data.advertisement_uuid_size != 0)
+				{
+					ESP_LOGE(BIODYN_BLE_TAG, "Only one length of UUID can be advertised. Tried to use %d when %d is already used.",
+							 service->service_id.id.uuid.len, biodyn_ble_data.advertisement_uuid_size);
+					biodyn_ble_data.error |= BIODYN_BLE_ERR_CANT_ADV_SERVICE;
+				}
+				else
+				{
+					uint16_t uuid_len = service->service_id.id.uuid.len;
+					uint16_t n_uuids = biodyn_ble_advertisement_data.service_uuid_len / uuid_len;
+					// Set the adv uuid len
+					biodyn_ble_data.advertisement_uuid_size = uuid_len;
+
+					// Add UUID to list
+					uint8_t *uuids = (uint8_t *)malloc(sizeof(uint8_t) * uuid_len * (n_uuids + 1));
+					memcpy(uuids, biodyn_ble_advertisement_data.p_service_uuid, sizeof(uint8_t) * uuid_len * n_uuids);
+					if (uuid_len == ESP_UUID_LEN_128)
+						memcpy(uuids + (n_uuids * uuid_len), service->service_id.id.uuid.uuid.uuid128, ESP_UUID_LEN_128);
+					else if (uuid_len == ESP_UUID_LEN_32)
+						memcpy(uuids + (n_uuids * uuid_len), service->service_id.id.uuid.uuid.uuid128, ESP_UUID_LEN_32);
+					else if (uuid_len == ESP_UUID_LEN_16)
+						memcpy(uuids + (n_uuids * uuid_len), service->service_id.id.uuid.uuid.uuid128, ESP_UUID_LEN_16);
+					else
+					{
+						ESP_LOGE(BIODYN_BLE_TAG, "Invalid UUID len: %d", uuid_len);
+						biodyn_ble_data.error = BIODYN_BLE_ERR_CANT_ADV_SERVICE;
+					}
+
+					// Update length
+					biodyn_ble_advertisement_data.service_uuid_len = (n_uuids + 1) * uuid_len * sizeof(uint8_t);
+
+					// Free old data and set new
+					if (n_uuids != 0)
+						free(biodyn_ble_advertisement_data.p_service_uuid);
+					biodyn_ble_advertisement_data.p_service_uuid = uuids;
+				}
+			}
 
 			// For each characteristic
 			for (int k = 0; k < service_schematic->n_characteristics; ++k)
