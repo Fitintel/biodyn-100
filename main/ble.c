@@ -128,6 +128,7 @@ struct biodyn_ble_characteristic_data
 	esp_attr_value_t initial_value;							   // The initial value associated with this descriptor
 	esp_attr_control_t response_type;						   // Auto-response with GATT or app-controlled
 	void (*get_data_fn)(uint16_t *size, void *dst);			   // Function called when a read is done and we aren't doing GATT auto-response
+	void (*set_data_fn)(uint16_t size, void *src);			   // Function called when a write is done and we aren't doing GATT auto-response
 
 	// TODO: How do we provide a nice interface to register characteristic info and callbacks?
 };
@@ -263,13 +264,13 @@ struct biodyn_ble_characteristic_data *get_characteristic_from_handle(uint16_t h
 // BLE advertisement data packet configuration.
 // This configures the structure of our packets.
 esp_ble_adv_data_t biodyn_ble_advertisement_data = {
-	.set_scan_rsp = false,									   // This is not a scan response packet
-	.include_name = true,									   // Include device name in advertisement
-	.include_txpower = true,								   // Include TX power in advertisement
-	.min_interval = 6,										   // Preffered connection minimum time interval
-	.max_interval = 12,										   // Preferred connection maximum time interval
-	.appearance = 0x090718,									   // Information about the device type (device class): ie. wearable etc
-	.manufacturer_len = BIODYN_MANUFACTURER_DATA_LEN,		   // See definition
+	.set_scan_rsp = false,										  // This is not a scan response packet
+	.include_name = true,										  // Include device name in advertisement
+	.include_txpower = true,									  // Include TX power in advertisement
+	.min_interval = 6,											  // Preffered connection minimum time interval
+	.max_interval = 12,											  // Preferred connection maximum time interval
+	.appearance = 0x090718,										  // Information about the device type (device class): ie. wearable etc
+	.manufacturer_len = BIODYN_MANUFACTURER_DATA_LEN,			  // See definition
 	.p_manufacturer_data = &biodyn_ble_data.manufacturer_data[0], // Pointer to manufacturer data
 
 	// TODO: We can advertise service data without a connection made.
@@ -532,7 +533,11 @@ void biodyn_ble_handle_read(struct gatts_read_evt_param *re)
 	uint8_t buf[BIODYN_BLE_MTU];
 	chr->get_data_fn(&data_len, &buf);
 
-	// TODO: Check we aren't using too much data
+	if (data_len > BIODYN_BLE_MTU)
+	{
+		ESP_LOGE(BIODYN_BLE_TAG, "Attempted to read too much data (%d) when max is %d", data_len, BIODYN_BLE_MTU);
+		biodyn_ble_data.error |= BIODYN_BLE_ERR_TOO_MUCH_DATA;
+	}
 
 	// Form a response
 	esp_gatt_rsp_t resp;
@@ -542,6 +547,47 @@ void biodyn_ble_handle_read(struct gatts_read_evt_param *re)
 
 	// Send the response
 	esp_ble_gatts_send_response(chr->service->profile->gatts_if, re->conn_id, re->trans_id, ESP_GATT_OK, &resp);
+}
+
+// Handles a ble gatts write event
+void biodyn_ble_handle_write(struct gatts_write_evt_param *wr)
+{
+	// Get the characteristic trying to be read
+	struct biodyn_ble_characteristic_data *chr = get_characteristic_from_handle(wr->handle);
+	if (!chr)
+	{
+		ESP_LOGE(BIODYN_BLE_TAG, "Couldn't find characteristic with handle %d", wr->handle);
+		biodyn_ble_data.error |= BIODYN_BLE_ERR_CANT_FIND_CHAR;
+		return;
+	}
+
+	// If it's auto-handled we ignore it
+	if (chr->response_type.auto_rsp == ESP_GATT_AUTO_RSP)
+		return;
+
+	ESP_LOGI(BIODYN_BLE_TAG, "Write request for characteristic \"%s\" in service \"%s\"", chr->name, chr->service->name);
+
+	// Get the data from the characteristic
+	if (!chr->set_data_fn)
+	{
+		ESP_LOGE(BIODYN_BLE_TAG, "Attempted to write characteristic \"%s\" but there was no set_data function", chr->name);
+		biodyn_ble_data.error |= BIODYN_BLE_ERR_CHARS_MISCONFIGURED;
+		return;
+	}
+	if (wr->len > BIODYN_BLE_MTU)
+	{
+		ESP_LOGE(BIODYN_BLE_TAG, "Attempted to write too much data (%d) when max is %d", wr->len, BIODYN_BLE_MTU);
+		biodyn_ble_data.error |= BIODYN_BLE_ERR_TOO_MUCH_DATA;
+		return;
+	}
+	chr->set_data_fn(wr->len, (void *)wr->value);
+
+	// Form a response
+	esp_gatt_rsp_t resp;
+	resp.attr_value.handle = wr->handle;
+
+	// Send the response
+	esp_ble_gatts_send_response(chr->service->profile->gatts_if, wr->conn_id, wr->trans_id, ESP_GATT_OK, &resp);
 }
 
 // The global gatts server event handler function
@@ -568,7 +614,7 @@ void biodyn_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 #ifdef LOG_GATTS
 		ESP_LOGI(BIODYN_BLE_TAG, "ESP_GATTS_WRITE_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d", param->read.conn_id, param->read.trans_id, param->read.handle);
 #endif // LOG_GATTS
-	   // TODO: Implement write event
+		biodyn_ble_handle_write(&param->write);
 		break;
 	}
 	case ESP_GATTS_EXEC_WRITE_EVT:
@@ -786,6 +832,7 @@ void biodyn_ble_load_schematic(uint16_t n_profiles, struct biodyn_ble_profile *p
 				chr->initial_value.attr_value = chr_schematic->initial_value;
 				chr->response_type.auto_rsp = chr_schematic->intial_value_size == 0 ? ESP_GATT_RSP_BY_APP : ESP_GATT_AUTO_RSP;
 				chr->get_data_fn = chr_schematic->get_data;
+				chr->set_data_fn = chr_schematic->set_data;
 				// Setup descriptors
 				chr->n_descriptors = chr_schematic->n_descriptors;
 				chr->descriptors = malloc(sizeof(struct biodyn_ble_char_descr_data) * chr->n_descriptors);

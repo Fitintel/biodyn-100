@@ -30,6 +30,7 @@ typedef uint16_t biodyn_ble_err_t;
 #define BIODYN_BLE_ERR_CANT_ADVERTISE 0x200		 // Couldn't start advertising
 #define BIODYN_BLE_ERR_CANT_STOP_ADVERTISE 0x400 // Couldn't stop advertising
 #define BIODYN_BLE_ERR_CANT_ADV_SERVICE 0x800	 // Couldn't advertise service
+#define BIODYN_BLE_ERR_TOO_MUCH_DATA 0x1000		 // Tried to read/write too much data
 
 // Returns any accumulated errors in the BIODYN BLE driver
 biodyn_ble_err_t biodyn_ble_get_err();
@@ -86,6 +87,10 @@ struct biodyn_ble_characteristic
 	// Writes data to the output buffer. Size must be less than MTU (517).
 	// This is not called if there is an initial value for this characteristic
 	void (*get_data)(uint16_t *size, void *out);
+
+	// Reads data from the input buffer. Size must be less than MTU (517).
+	// This is not called if there is an initial value for this characteristic.
+	void (*set_data)(uint16_t size, void *in);
 
 	// TODO: Add callback when characteristic is completely set up
 };

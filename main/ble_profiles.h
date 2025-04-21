@@ -3,6 +3,7 @@
 
 #include "constants.h"
 #include "ble.h"
+#include "led.h"
 
 static struct biodyn_ble_characteristic device_info_chars[] = {
 	{
@@ -37,15 +38,30 @@ void get_data_test(uint16_t *len, void *dst)
 	*len = strlen(my_data) * sizeof(char);
 	memcpy(dst, my_data, *len);
 }
+void set_data_test(uint16_t len, void *src)
+{
+	char buf[517];
+	memcpy(buf, src, len);
+	buf[len] = '\0';
+	ESP_LOGI("PROFILES", "Tried to write \"%s\"", buf);
+}
 
 static struct biodyn_ble_characteristic sensor_test_chars[] = {
 	{
 		.name = "Test Read Function",
 		.uuid = BIODYN_BLE_UUID_16(0x1234),
-		.permissions = ESP_GATT_PERM_READ,
-		.properties = ESP_GATT_CHAR_PROP_BIT_READ,
+		.permissions = ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+		.properties = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE,
 		.get_data = get_data_test,
+		.set_data = set_data_test
 	},
+	{
+		.name = "LED Control",
+		.uuid = BIODYN_BLE_UUID_16(0x1235),
+		.permissions = ESP_GATT_PERM_WRITE,
+		.properties = ESP_GATT_CHAR_PROP_BIT_WRITE,
+		.set_data = led_set_state,
+	}
 };
 static struct biodyn_ble_service sensor_services[] = {
 	{

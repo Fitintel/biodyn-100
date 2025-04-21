@@ -39,6 +39,13 @@ void app_main(void)
 		return;
 	}
 
+	// Initialize LED
+	if ((err = biodyn_led_init()))
+	{
+		ESP_LOGE(MAIN_TAG, "Failed to initialize LED module, err = %d", err);
+		return;
+	}
+
 	// Initialize bluetooth
 	if ((err = biodyn_ble_init(LEN_OF_STATIC_ARRAY(profiles), &profiles[0])))
 	{
