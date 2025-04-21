@@ -5,7 +5,7 @@
 #include "driver/gpio.h"
 
 
-#define LED_PIN GPIO_NUM_48
+#define LED_PIN GPIO_NUM_7
 
 esp_err_t biodyn_led_init()
 {
