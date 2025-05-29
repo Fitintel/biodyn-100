@@ -1,8 +1,8 @@
 menu "BIODYN-100 Config"
 
-    config CONFIG_OPTION_EXAMPLE
-        bool "a short description" 
+    config DEVICE_MODEL_NUMBER
+        string "Device model number" 
         help
-			a long description. config option is set as a macro to given value during compile.
+			The device model number.
 endmenu
 

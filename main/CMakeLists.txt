@@ -1,2 +1,2 @@
-idf_component_register(SRCS "main.c" "temp_mc65f103an_driver.c"
+idf_component_register(SRCS "main.c" "temp_mc65f103an_driver.c" "ble.c" "led.c"
                     INCLUDE_DIRS ".")
