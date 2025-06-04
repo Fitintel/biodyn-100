@@ -24,6 +24,7 @@
 #include "nvs.h"
 #include "ble.h"
 #include "ble_profiles.h"
+#include "imu_icm20948_driver.h"
 
 // APP ENTRY POINT
 void app_main(void)
@@ -43,6 +44,13 @@ void app_main(void)
 	if ((err = biodyn_led_init()))
 	{
 		ESP_LOGE(MAIN_TAG, "Failed to initialize LED module, err = %d", err);
+		return;
+	}
+
+	// Initialize IMU
+	if ((err = biodyn_imu_icm20948_init()))
+	{
+		ESP_LOGE(MAIN_TAG, "Failed to initialize IMU module, err = %d", err);
 		return;
 	}
 

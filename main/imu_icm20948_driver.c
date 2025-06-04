@@ -1,6 +1,69 @@
 #include "imu_icm20948_driver.h"
 
-// TODO: create driver init function
+#include "hal/spi_types.h"
+#include "driver/spi_master.h"
+#include "driver/gpio.h"
+
+#define TAG "IMU_ICM20948"
+
+// IMU driver data
+static struct 
+{
+	i2c_config_t i2c;
+} imu_data = {
+	{ 
+		.mosi = GPIO_NUM_10,
+		.miso = GPIO_NUM_11,
+		.sclk = GPIO_NUM_12,
+		.cs = GPIO_NUM_13,
+	}
+};
+
+// Initializes the IMU
+biodyn_imu_err_t biodyn_imu_icm20948_init()
+{
+	// Create bus config
+	spi_bus_config_t bus_config = {
+		.miso_io_num = imu_data.i2c.miso,
+		.mosi_io_num = imu_data.i2c.mosi,
+		.sclk_io_num = imu_data.i2c.sclk,
+		.quadwp_io_num = -1, // not used
+		.quadhd_io_num = -1, // not used
+		.max_transfer_sz = 4096, // TODO: extract to config
+	};
+
+	// Initialize bus
+	esp_err_t err = spi_bus_initialize(SPI2_HOST, &bus_config, SPI_DMA_CH_AUTO);
+	if (err != ESP_OK)
+	{
+		ESP_LOGE(TAG, "Failed to initialize SPI bus, error %d", err);
+		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS;
+	}
+
+	// Initialize interface
+	spi_device_interface_config_t spi_dev_config = {
+		.clock_speed_hz = 1000 * 1000, // 1 MHz
+		.mode = 0, // TODO: why?
+		.spics_io_num = imu_data.i2c.cs,
+		.queue_size = 7, // TODO: why?
+	};
+	spi_device_handle_t handle;
+	err = spi_bus_add_device(SPI2_HOST, &spi_dev_config, &handle);
+	if (err != ESP_OK)
+	{
+		ESP_LOGE(TAG, "Failed to initialize SPI device, error %d", err);
+		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
+	}
+
+	// TODO: implement
+
+	ESP_LOGI(TAG, "Initialized IMU");
+
+	// Ok.
+	return BIODYN_IMU_OK;
+}
+
+// TODO: create self-test function
 
 // TODO: create function(s) to read gyro data
 
