@@ -64,7 +64,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	return BIODYN_IMU_OK;
 }
 
-// TODO: create self-test function
+// Self-test function
 biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 {
 	// Send who am i message
@@ -85,12 +85,32 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	// Check that WHOAMI value is the same
 	if (rx_data != 0xEA)
 		return BIODYN_IMU_ERR_WRONG_WHOAMI;
+
+	// TODO: Use chip's actual self-test now
 	
-	return ESP_OK;
+	return BIODYN_IMU_OK;
 }
 
-// TODO: create function(s) to read gyro data
+// Reads and returns gyro data
+biodyn_imu_err_t biodyn_imu_icm20948_read_gyro(imu_float3_t *out)
+{
+	// TODO: implement!
 
-// TODO: create function(s) to read accelerometer data
+	return BIODYN_IMU_OK;
+}
 
-// TODO: create function(s) to read compass
+// Reads and returns accelerometer data
+biodyn_imu_err_t biodyn_imu_icm20948_read_accel(imu_float3_t *out)
+{
+	// TODO: implement!
+
+	return BIODYN_IMU_OK;
+}
+
+// reads and returns compass data
+biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out)
+{
+	// TODO: implement!
+
+	return BIODYN_IMU_OK;
+}

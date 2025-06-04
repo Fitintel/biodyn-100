@@ -5,6 +5,13 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 
+struct imu_float3
+{
+	float x;
+	float y;
+	float z;
+};
+typedef struct imu_float3 imu_float3_t;
 
 // i2c pins for a device
 struct i2c_config {
@@ -29,6 +36,15 @@ biodyn_imu_err_t biodyn_imu_icm20948_init();
 
 // Performs an IMU self-test
 biodyn_imu_err_t biodyn_imu_icm20948_self_test();
+
+// Reads and returns gyro data
+biodyn_imu_err_t biodyn_imu_icm20948_read_gyro(imu_float3_t *out);
+
+// Reads and returns accelerometer data
+biodyn_imu_err_t biodyn_imu_icm20948_read_accel(imu_float3_t *out);
+
+// reads and returns compass data
+biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out);
 
 
 #endif // ICM20948_DRIVER_H
