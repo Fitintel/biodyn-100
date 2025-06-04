@@ -21,9 +21,14 @@ typedef uint16_t biodyn_imu_err_t;
 #define BIODYN_IMU_OK 0
 #define BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS 0x1
 #define BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV 0x2
+#define BIODYN_IMU_ERR_COULDNT_SEND_DATA 0x4
+#define BIODYN_IMU_ERR_WRONG_WHOAMI 0x8
 
 // Initializes the IMU
 biodyn_imu_err_t biodyn_imu_icm20948_init();
+
+// Performs an IMU self-test
+biodyn_imu_err_t biodyn_imu_icm20948_self_test();
 
 
 #endif // ICM20948_DRIVER_H

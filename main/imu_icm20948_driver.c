@@ -10,13 +10,15 @@
 static struct 
 {
 	i2c_config_t i2c;
+	spi_device_handle_t handle;
 } imu_data = {
 	{ 
 		.mosi = GPIO_NUM_10,
 		.miso = GPIO_NUM_11,
 		.sclk = GPIO_NUM_12,
 		.cs = GPIO_NUM_13,
-	}
+	},
+	NULL,
 };
 
 // Initializes the IMU
@@ -47,8 +49,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 		.spics_io_num = imu_data.i2c.cs,
 		.queue_size = 7, // TODO: why?
 	};
-	spi_device_handle_t handle;
-	err = spi_bus_add_device(SPI2_HOST, &spi_dev_config, &handle);
+	err = spi_bus_add_device(SPI2_HOST, &spi_dev_config, &imu_data.handle);
 	if (err != ESP_OK)
 	{
 		ESP_LOGE(TAG, "Failed to initialize SPI device, error %d", err);
@@ -64,6 +65,29 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 }
 
 // TODO: create self-test function
+biodyn_imu_err_t biodyn_imu_icm20948_self_test()
+{
+	// Send who am i message
+
+	uint8_t tx_data = 0x0; // WHO_AM_I
+	uint8_t rx_data = 0x0; // Recieved
+
+	spi_transaction_t trans = {
+		.length = 8,
+		.tx_buffer = &tx_data,
+		.rx_buffer = &rx_data,
+	};
+
+	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
+	if (err != ESP_OK)
+		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
+	
+	// Check that WHOAMI value is the same
+	if (rx_data != 0xEA)
+		return BIODYN_IMU_ERR_WRONG_WHOAMI;
+	
+	return ESP_OK;
+}
 
 // TODO: create function(s) to read gyro data
 
