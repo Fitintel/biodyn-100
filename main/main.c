@@ -68,9 +68,12 @@ void app_main(void)
 
 
 	while(1){
-		int voltage = biodyn_temperature_read_voltage_mv();
-		ESP_LOGI(MAIN_TAG, "Read voltage: %d", voltage);
+		float temperature = biodyn_get_temperature_celsius_debug();
+//		int ref_voltage = read_vcc_mv();
+		ESP_LOGI(MAIN_TAG, "Read temperature: %.4f degrees celsius", temperature);
+//		ESP_LOGI(MAIN_TAG, "Read reference voltage: %.4d mV", ref_voltage);
 
-		vTaskDelay(pdMS_TO_TICKS(500));
+
+//		vTaskDelay(pdMS_TO_TICKS(500));
 	}
 }
