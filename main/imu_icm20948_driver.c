@@ -13,10 +13,10 @@ static struct
 	spi_device_handle_t handle;
 } imu_data = {
 	{ 
-		.mosi = GPIO_NUM_10,
-		.miso = GPIO_NUM_11,
-		.sclk = GPIO_NUM_12,
-		.cs = GPIO_NUM_13,
+		.mosi = GPIO_NUM_11,
+		.miso = GPIO_NUM_12,
+		.sclk = GPIO_NUM_13,
+		.cs = GPIO_NUM_14,
 	},
 	NULL,
 };
