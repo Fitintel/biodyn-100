@@ -41,11 +41,11 @@ void app_main(void)
 	}
 
 	// Initialize LED
-//	if ((err = biodyn_led_init()))
-//	{
-//		ESP_LOGE(MAIN_TAG, "Failed to initialize LED module, err = %d", err);
-//		return;
-//	}
+	if ((err = biodyn_led_init()))
+	{
+		ESP_LOGE(MAIN_TAG, "Failed to initialize LED module, err = %d", err);
+		return;
+	}
 
 	// Initialize bluetooth
 	if ((err = biodyn_ble_init(LEN_OF_STATIC_ARRAY(profiles), &profiles[0])))
@@ -55,25 +55,18 @@ void app_main(void)
 	}
 
 	// Initialize temperature
-	if ((err = biodyn_temperature_init()))
-	{
-		ESP_LOGE(MAIN_TAG, "Failed to initialize Temperature Driver in %s, err code %x", __func__, err);
-		return;
-	}
+	// if ((err = biodyn_temperature_init()))
+	// {
+		// ESP_LOGE(MAIN_TAG, "Failed to initialize Temperature Driver in %s, err code %x", __func__, err);
+		// return;
+	// }
 
 	// Set up!
 	ESP_LOGI(MAIN_TAG, "Finished setup");
 
-
-
-
-	while(1){
-		float temperature = biodyn_get_temperature_celsius_debug();
-//		int ref_voltage = read_vcc_mv();
-		ESP_LOGI(MAIN_TAG, "Read temperature: %.4f degrees celsius", temperature);
-//		ESP_LOGI(MAIN_TAG, "Read reference voltage: %.4d mV", ref_voltage);
-
-
-//		vTaskDelay(pdMS_TO_TICKS(500));
-	}
+	// while(1){
+		// float temperature = biodyn_get_temperature_celsius_debug();
+		// ESP_LOGI(MAIN_TAG, "Read temperature: %.4f degrees celsius", temperature);
+		// vTaskDelay(500 / portTICK_PERIOD_MS);
+	// }
 }

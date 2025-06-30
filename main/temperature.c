@@ -1,5 +1,6 @@
 #include "esp_system.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "driver/gpio.h"
 #include "esp_adc/adc_continuous.h"
 #include "esp_adc/adc_cali.h"
@@ -7,7 +8,7 @@
 #include "math.h"
 #define READ_BUFFER_SIZE     1024
 #define SAMPLE_FREQ_HZ       (10 * 100 * 1000)
-#define TEMPERATURE_PIN      GPIO_NUM_36
+#define TEMPERATURE_PIN      GPIO_NUM_2
 #define TEMPERATURE_CHANNEL  ADC_CHANNEL_0
 #define TEMPERATURE_UNIT     ADC_UNIT_1
 
@@ -84,17 +85,17 @@ esp_err_t biodyn_temperature_init()
     err = adc_continuous_config(adc_handle, &dig_cfg);
     if (err != ESP_OK) return err;
 
-    adc_cali_line_fitting_config_t cali_config = {
+    adc_cali_curve_fitting_config_t cali_config = {
         .unit_id = TEMPERATURE_UNIT,
         .atten = ADC_ATTEN_DB_12,
         .bitwidth = SOC_ADC_DIGI_MAX_BITWIDTH,
     };
-    adc_cali_create_scheme_line_fitting(&cali_config, &adc_cali_handle);
+    adc_cali_create_scheme_curve_fitting(&cali_config, &adc_cali_handle);
 
     err = adc_continuous_start(adc_handle);
     if (err != ESP_OK) return err;
 
-    ESP_LOGI(TAG, "Initialized continuous ADC on GPIO36");
+    ESP_LOGI(TAG, "Initialized continuous ADC on GPIO2");
     return ESP_OK;
 }
 
@@ -112,8 +113,8 @@ int biodyn_temperature_read_voltage_mv()
     for (int i = 0; i < bytes_read; i += sizeof(adc_digi_output_data_t)) {
         adc_digi_output_data_t *sample = (adc_digi_output_data_t *)&result[i];
 
-        if (sample->type1.channel == TEMPERATURE_CHANNEL) {
-            raw = sample->type1.data;
+        if (sample->type2.channel == TEMPERATURE_CHANNEL) {
+            raw = sample->type2.data;
             break;
         }
     }
@@ -196,8 +197,8 @@ int read_vcc_mv()
 
     for (int i = 0; i < bytes_read; i += sizeof(adc_digi_output_data_t)) {
         adc_digi_output_data_t *sample = (adc_digi_output_data_t *)&result[i];
-        if (sample->type1.channel == VCC_CHANNEL) {
-            raw = sample->type1.data;
+        if (sample->type2.channel == VCC_CHANNEL) {
+            raw = sample->type2.data;
             break;
         }
     }
