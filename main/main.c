@@ -63,4 +63,11 @@ void app_main(void)
 
 	// Set up!
 	ESP_LOGI(MAIN_TAG, "Finished setup");
+
+	for (;;)
+	{
+		vTaskDelay(pdMS_TO_TICKS(500));
+		imu_float3_t out = {.0, .0, .0};
+		biodyn_imu_icm20948_read_accel(&out);
+	}
 }

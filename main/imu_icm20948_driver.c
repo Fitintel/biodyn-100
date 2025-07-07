@@ -13,10 +13,10 @@ static struct
 	spi_device_handle_t handle;
 } imu_data = {
 	{ 
-		.mosi = GPIO_NUM_11,
-		.miso = GPIO_NUM_12,
-		.sclk = GPIO_NUM_13,
 		.cs = GPIO_NUM_14,
+		.miso = GPIO_NUM_13,
+		.sclk = GPIO_NUM_12,
+		.mosi = GPIO_NUM_11,
 	},
 	NULL,
 };
@@ -29,9 +29,6 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 		.miso_io_num = imu_data.i2c.miso,
 		.mosi_io_num = imu_data.i2c.mosi,
 		.sclk_io_num = imu_data.i2c.sclk,
-		.quadwp_io_num = -1, // not used
-		.quadhd_io_num = -1, // not used
-		.max_transfer_sz = 4096, // TODO: extract to config
 	};
 
 	// Initialize bus
@@ -58,6 +55,8 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 
 	// TODO: implement
 
+	biodyn_imu_icm20948_self_test();
+
 	ESP_LOGI(TAG, "Initialized IMU");
 
 	// Ok.
@@ -67,24 +66,33 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 // Self-test function
 biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 {
+	ESP_LOGI(TAG, "Running self test");
+
 	// Send who am i message
 
-	uint8_t tx_data = 0x0; // WHO_AM_I
-	uint8_t rx_data = 0x0; // Recieved
+	uint8_t tx_data[2] = { 0x80, 0x0 }; // {read, WHO_AM_I}
+	uint8_t rx_data[2] = { 0x0, 0x0 }; // Recieved
 
 	spi_transaction_t trans = {
-		.length = 8,
+		.length = 16,
+		.rxlength = 16,
 		.tx_buffer = &tx_data,
 		.rx_buffer = &rx_data,
 	};
 
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
+	{
+		ESP_LOGE(TAG, "Failed to transmit data over SPI");
 		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
+	}
 	
 	// Check that WHOAMI value is the same
-	if (rx_data != 0xEA)
+	if (rx_data[1] != 0xEA)
+	{
+		ESP_LOGE(TAG, "Got wrong WHOAMI response: %x", rx_data[1]);
 		return BIODYN_IMU_ERR_WRONG_WHOAMI;
+	}
 
 	// TODO: Use chip's actual self-test now
 	
