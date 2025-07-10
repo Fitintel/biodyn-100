@@ -1,4 +1,4 @@
-
+.project
 build/
 build_*_*/
 sdkconfig
