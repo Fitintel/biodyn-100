@@ -61,22 +61,20 @@ void app_main(void)
 		ESP_LOGE(MAIN_TAG, "Failed to initialize Bluetooth in %s, err code %x", __func__, err);
 		return;
 	}
-
-	// Set up!
-	ESP_LOGI(MAIN_TAG, "Finished setup");
-
-	biodyn_imu_icm20948_read_user_ctrl();
-
-
-	biodyn_imu_icm20948_run_accel_test();
-
-	for (;;)
-	{
-//		vTaskDelay(pdMS_TO_TICKS(500));
-		sleep(1);
-		biodyn_imu_icm20948_run_accel_test();
-//		imu_int_16_3_t out = {0};
-//		biodyn_imu_icm20948_read_accel(&out);
-//		ESP_LOGI(MAIN_TAG, "READ: accel_x = %d, accel_y = %d, accel_z = %d", out.x, out.y, out.z);
-	}
 }
+
+
+/**
+ *
+ * USER BANK TEST R/W BELOW
+uint8_t initial_bank_value = 7;
+get_user_bank(&initial_bank_value);
+ESP_LOGI(MAIN_TAG, "Read user bank as %d", initial_bank_value);
+
+uint8_t write_bank_value = 0;
+select_user_bank(write_bank_value);
+ESP_LOGI(MAIN_TAG, "Wrote user bank as %d", write_bank_value);
+
+get_user_bank(&initial_bank_value);
+ESP_LOGI(MAIN_TAG, "Read user bank as %d", initial_bank_value);
+*/

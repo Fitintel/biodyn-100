@@ -5,6 +5,60 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 
+#define TAG "IMU_ICM20948"
+
+#define ACCEL_XOUT_H 0x2d
+#define ACCEL_XOUT_L 0x2e
+#define ACCEL_YOUT_H 0x2f
+#define ACCEL_YOUT_L 0x30
+#define ACCEL_ZOUT_H 0x31
+#define ACCEL_ZOUT_L 0x32
+#define REG_BANK_SEL 0x7f
+#define ODR_ALIGN_EN 0x09
+
+#define READ_MSB 0x80
+#define WRITE_MSB 0x00
+
+#define ACCEL_RANGE_VALUE _accel_4g
+#define GYRO_RANGE_VALUE _gyro_1000dps
+
+
+typedef struct {
+	int16_t accel_x;
+	int16_t accel_y;
+	int16_t accel_z;
+	int16_t gyro_x;
+	int16_t gyro_y;
+	int16_t gyro_z;
+	int16_t mag_x;
+	int16_t mag_y;
+	int16_t mag_z;
+} imu_data;
+
+typedef enum
+{
+	_gyro_250dps,
+	_gyro_500dps,
+	_gyro_1000dps,
+	_gyro_2000dps,
+} gyro_range;
+
+typedef enum
+{
+	_accel_2g,
+	_accel_4g,
+	_accel_8g,
+	_accel_16g,
+} accel_range;
+
+typedef enum
+{
+	_b0 = 0,
+	_b1 = 1 << 4,
+	_b2 = 2 << 4,
+	_b3 = 3 << 4,
+} user_bank_range;
+
 struct imu_float3
 {
 	float x;
@@ -39,12 +93,18 @@ typedef uint16_t biodyn_imu_err_t;
 #define BIODYN_IMU_ERR_COULDNT_SEND_DATA 0x4
 #define BIODYN_IMU_ERR_WRONG_WHOAMI 0x8
 
+#define BIODYN_IMU_ERR_INVALID_ARGUMENT 0x5
+
 // Initializes the IMU
 biodyn_imu_err_t biodyn_imu_icm20948_init();
 
 // Performs an IMU self-test
 biodyn_imu_err_t biodyn_imu_icm20948_self_test();
 
+// Sets the user bank of registers
+biodyn_imu_err_t select_user_bank(uint8_t bank);
+// Reads the user bank of registers
+biodyn_imu_err_t get_user_bank(uint8_t *bank_out);
 // Reads and returns gyro data
 biodyn_imu_err_t biodyn_imu_icm20948_read_gyro(imu_float3_t *out);
 

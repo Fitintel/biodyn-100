@@ -4,24 +4,6 @@
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 
-#define TAG "IMU_ICM20948"
-
-#define ACCEL_XOUT_H 0x2d
-#define ACCEL_XOUT_L 0x2e
-#define ACCEL_YOUT_H 0x2f
-#define ACCEL_YOUT_L 0x30
-#define ACCEL_ZOUT_H 0x31
-#define ACCEL_ZOUT_L 0x32
-
-//typedef struct {
-//	int16_t accel_x;
-//	int16_t accel_y;
-//	int16_t accel_z;
-//} imu_accel_data;
-
-
-
-
 // IMU driver data
 static struct 
 {
@@ -61,7 +43,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// Initialize interface
 	spi_device_interface_config_t spi_dev_config = {
 		.clock_speed_hz = 1000 * 1000, // 1 MHz
-		.mode = 0, // TODO: why?
+		.mode = 3, // TODO: why? - CPOL is high and CPHA is is rising edge sampling
 		.spics_io_num = imu_data.i2c.cs,
 		.queue_size = 7, // TODO: why?
 	};
@@ -81,6 +63,65 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// Ok.
 	return BIODYN_IMU_OK;
 }
+
+
+biodyn_imu_err_t select_user_bank(uint8_t bank)
+{
+	if (bank > 3) return BIODYN_IMU_ERR_INVALID_ARGUMENT;
+
+    uint8_t tx_data[2];
+    tx_data[0] = REG_BANK_SEL | WRITE_MSB;         // 0x7F
+    tx_data[1] = (bank << 4) & 0x30;   // only bits [5:4] are for user bank select, rest are reserved
+
+    spi_transaction_t trans = {
+        .length = 8 * 2,
+        .tx_buffer = tx_data,
+        .rx_buffer = NULL,
+    };
+
+    esp_err_t err =  spi_device_transmit(imu_data.handle, &trans);
+    if (err != ESP_OK)
+    {
+    	ESP_LOGE(TAG, "Failed to transmit data over SPI (selecting_user_bank function with bank value %d)", bank);
+    	return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
+    }
+
+    return BIODYN_IMU_OK;
+}
+
+biodyn_imu_err_t get_user_bank(uint8_t *bank_out)
+{
+    if (!bank_out) return BIODYN_IMU_ERR_INVALID_ARGUMENT;
+
+    uint8_t tx_data[2] = { REG_BANK_SEL | READ_MSB, 0x00 };
+    uint8_t rx_data[2] = {0};
+
+    spi_transaction_t trans = {
+        .length = 8 * 2,
+        .tx_buffer = tx_data,
+        .rx_buffer = rx_data,
+    };
+
+    esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
+    if (err != ESP_OK) return err;
+
+    // rx_data[1] contains read  and rx[0] is dummy garbage
+    *bank_out = (rx_data[1] >> 4) & 0x03;  // mask for only bits [5:4]
+
+    return ESP_OK;
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 // read accel data function
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel(imu_int_16_3_t *out)
