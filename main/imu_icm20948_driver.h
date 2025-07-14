@@ -126,6 +126,11 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test();
 biodyn_imu_err_t select_user_bank(uint8_t bank);
 // Reads the user bank of registers
 biodyn_imu_err_t get_user_bank(uint8_t *bank_out);
+// Writes data to a single register specified by a bank and address to the IMU
+biodyn_imu_err_t write_single_register(uint8_t bank, uint16_t register_address, uint16_t write_data);
+// Reads data of a single register specified by a bank and address of the IMU
+biodyn_imu_err_t read_single_register(uint8_t bank, uint16_t register_address, uint16_t *out);
+
 // Reads and returns gyro data
 biodyn_imu_err_t biodyn_imu_icm20948_read_gyro(imu_float3_t *out);
 

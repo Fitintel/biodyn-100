@@ -108,10 +108,47 @@ biodyn_imu_err_t get_user_bank(uint8_t *bank_out)
     // rx_data[1] contains read  and rx[0] is dummy garbage
     *bank_out = (rx_data[1] >> 4) & 0x03;  // mask for only bits [5:4]
 
-    return ESP_OK;
+    return BIODYN_IMU_OK;
 }
 
 
+biodyn_imu_err_t read_single_register(uint8_t bank, uint16_t register_address, uint16_t *out)
+{
+	select_user_bank(bank);
+	uint8_t tx_data[2] = { REG_BANK_SEL | READ_MSB, 0x00 };
+	uint8_t rx_data[2] = {0};
+
+	spi_transaction_t trans = {
+		.length = 8 * 2,
+		.tx_buffer = tx_data,
+		.rx_buffer = rx_data,
+	};
+
+	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
+	if (err != ESP_OK) return err;
+
+	// rx_data[1] contains read  and rx[0] is dummy garbage
+	*out = rx_data[1];
+	return BIODYN_IMU_OK;
+}
+
+biodyn_imu_err_t write_single_register(uint8_t bank, uint16_t register_address, uint16_t write_data)
+{
+	if(!write_data) return BIODYN_IMU_ERR_INVALID_ARGUMENT;
+	select_user_bank(bank);
+	uint8_t tx_data[2] = { REG_BANK_SEL | WRITE_MSB, write_data};
+//	uint8_t rx_data[2] = {0};
+
+	spi_transaction_t trans = {
+		.length = 8 * 2,
+		.tx_buffer = tx_data,
+		.rx_buffer = NULL,
+	};
+
+	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
+	if (err != ESP_OK) return err;
+	return BIODYN_IMU_OK;
+}
 
 
 
