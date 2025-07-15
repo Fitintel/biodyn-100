@@ -7,6 +7,7 @@
 
 #define TAG "IMU_ICM20948"
 
+#define IMU_WHOAMI 0x0
 #define ACCEL_XOUT_H 0x2d
 #define ACCEL_XOUT_L 0x2e
 #define ACCEL_YOUT_H 0x2f
@@ -113,6 +114,7 @@ typedef uint16_t biodyn_imu_err_t;
 #define BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV 0x2
 #define BIODYN_IMU_ERR_COULDNT_SEND_DATA 0x4
 #define BIODYN_IMU_ERR_WRONG_WHOAMI 0x8
+#define BIODYN_IMU_ERR_COULDNT_CONFIGURE 0x10
 
 #define BIODYN_IMU_ERR_INVALID_ARGUMENT 0x5
 
@@ -122,14 +124,6 @@ biodyn_imu_err_t biodyn_imu_icm20948_init();
 // Performs an IMU self-test
 biodyn_imu_err_t biodyn_imu_icm20948_self_test();
 
-// Sets the user bank of registers
-biodyn_imu_err_t select_user_bank(uint8_t bank);
-// Reads the user bank of registers
-biodyn_imu_err_t get_user_bank(uint8_t *bank_out);
-// Writes data to a single register specified by a bank and address to the IMU
-biodyn_imu_err_t write_single_register(uint8_t bank, uint16_t register_address, uint16_t write_data);
-// Reads data of a single register specified by a bank and address of the IMU
-biodyn_imu_err_t read_single_register(uint8_t bank, uint16_t register_address, uint16_t *out);
 
 // Reads and returns gyro data
 biodyn_imu_err_t biodyn_imu_icm20948_read_gyro(imu_float3_t *out);
