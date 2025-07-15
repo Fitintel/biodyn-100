@@ -50,7 +50,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// Initialize interface
 	spi_device_interface_config_t spi_dev_config = {
 		.clock_speed_hz = 1000 * 1000, // 1 MHz
-		.mode = 3,					   // TODO: why? - CPOL is high and CPHA is is rising edge sampling
+		.mode = 0,					   // TODO: why? - CPOL is high and CPHA is is rising edge sampling
 		.spics_io_num = imu_data.i2c.cs,
 		.queue_size = 7, // TODO: why?
 	};
@@ -69,7 +69,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// Set to SPI mode only with no DMP: 00010000 -> 0x10
 	uint8_t user_ctl = 0x10;
 	write_single_register(0, USER_CTRL, user_ctl);
-	// vTaskDelay(pdMS_TO_TICKS(50)); // Let settle
+	vTaskDelay(pdMS_TO_TICKS(50)); // Let settle
 	uint8_t user_ctl_out = 0;
 	read_single_register(0, USER_CTRL, &user_ctl_out);
 	if (user_ctl != user_ctl_out)
@@ -180,14 +180,11 @@ biodyn_imu_err_t write_single_register(uint8_t bank, uint16_t register_address, 
 
 	// Use input register address OR with WRITE_MSB (0), with write data as second argument
 	uint8_t tx_data[2] = {register_address | WRITE_MSB, write_data};
-	// Receiving data array
-	int8_t rx_data[2] = {0, 0};
 
 	// length 2 (bytes) = max{rx_data length, tx_data length}
 	spi_transaction_t trans = {
 		.length = 8 * 2,
 		.tx_buffer = tx_data,
-		.rx_buffer = rx_data,
 	};
 	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
@@ -258,7 +255,25 @@ biodyn_imu_err_t self_test_user_banks()
 }
 biodyn_imu_err_t self_test_gyro()
 {
-	// TODO: this
+	biodyn_imu_err_t err;
+
+	// Get previous gyro2 config
+	uint8_t gyro2_cfg = 0;
+	if ((err = read_single_register(2, GYRO_CONFIG_2, &gyro2_cfg)))
+	{
+		ESP_LOGE(TAG, "Failed to read GYRO_CONFIG_2: %x", err);
+		return err;
+	}
+	ESP_LOGI(TAG, "Got GYRO_CONFIG_2: %x", gyro2_cfg);
+
+	// TODO: Add self-test
+
+	// TODO: Write new gyro2 config with self-test
+
+	// TODO: Read gyro self-test values
+
+	// TODO: Write gyro2 config without self-test
+
 	return BIODYN_IMU_OK;
 }
 biodyn_imu_err_t biodyn_imu_icm20948_self_test()
@@ -277,8 +292,13 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	{
 		ESP_LOGE(TAG, "Self test failed - user banks (%x)", err);
 	}
-
-	// TODO: Use chip's actual self-test now
+	// Run gyro self-test
+	if ((err = self_test_gyro()))
+	{
+		ESP_LOGE(TAG, "Self test failed - gyro (%x)", err);
+	}
+	// TODO: Run accel self-test
+	// TODO: Run mag self-test
 
 	return BIODYN_IMU_OK;
 }
