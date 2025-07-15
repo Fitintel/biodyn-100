@@ -1,4 +1,5 @@
 #include "imu_icm20948_driver.h"
+#include "imu_icm20948_consts.h"
 
 #include "hal/spi_types.h"
 #include "driver/spi_master.h"
@@ -111,7 +112,6 @@ biodyn_imu_err_t select_user_bank(uint8_t bank)
 	// Successful write, all clear
 	return BIODYN_IMU_OK;
 }
-
 biodyn_imu_err_t get_user_bank(uint8_t *bank_out)
 {
 	// Pointer must be valid
@@ -173,7 +173,6 @@ biodyn_imu_err_t read_single_register(uint8_t bank, uint16_t register_address, u
 	// Successful write, all clear
 	return BIODYN_IMU_OK;
 }
-
 biodyn_imu_err_t write_single_register(uint8_t bank, uint16_t register_address, uint8_t write_data)
 {
 	// Select user bank to write to
@@ -199,38 +198,7 @@ biodyn_imu_err_t write_single_register(uint8_t bank, uint16_t register_address, 
 	return BIODYN_IMU_OK;
 }
 
-// read accel data function
-biodyn_imu_err_t biodyn_imu_icm20948_read_accel(imu_int_16_3_t *out)
-{
-	ESP_LOGI(TAG, "Reading accel data");
-	uint8_t tx_data[7];
-	tx_data[0] = ACCEL_XOUT_H | 0x80;
-	uint8_t rx_data[7];
-
-	spi_transaction_t trans = {
-		.length = (8 * 7),
-		.rxlength = (8 * 7),
-		.tx_buffer = &tx_data,
-		.rx_buffer = &rx_data,
-	};
-
-	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
-	if (err != ESP_OK)
-	{
-		ESP_LOGE(TAG, "Failed to transmit data over SPI (reading accelerometer)");
-		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
-	}
-
-	ESP_LOGI(TAG, "GOT OUTPUT BUFFER: %x, %x, %x, %x, %x, %x, %x",
-			 rx_data[0], rx_data[1], rx_data[2], rx_data[3], rx_data[4], rx_data[5], rx_data[6]);
-
-	out->x = ((int16_t)rx_data[1] << 8) + rx_data[2];
-	out->y = ((int16_t)rx_data[3] << 8) + rx_data[4];
-	out->z = ((int16_t)rx_data[5] << 8) + rx_data[6];
-	ESP_LOGI(TAG, "READ: accel_x = %x, accel_y = %x, accel_z = %x", out->x, out->y, out->z);
-	return BIODYN_IMU_OK;
-}
-
+// Self-test functions
 biodyn_imu_err_t self_test_whoami()
 {
 	uint8_t tx_data[2] = {READ_MSB | IMU_WHOAMI, 0x0}; // {read, WHO_AM_I}
@@ -256,7 +224,7 @@ biodyn_imu_err_t self_test_whoami()
 		return BIODYN_IMU_ERR_WRONG_WHOAMI;
 	}
 
-	ESP_LOGI(TAG, "\tGot correct WHOAMI response: %x", rx_data[1]);
+	ESP_LOGI(TAG, "\tWHOAMI (%x) OK", rx_data[1]);
 
 	return BIODYN_IMU_OK;
 }
@@ -288,8 +256,11 @@ biodyn_imu_err_t self_test_user_banks()
 	ESP_LOGI(TAG, "\tUser banks OK");
 	return BIODYN_IMU_OK;
 }
-
-// Self-test function
+biodyn_imu_err_t self_test_gyro()
+{
+	// TODO: this
+	return BIODYN_IMU_OK;
+}
 biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 {
 	ESP_LOGI(TAG, "Running self test");
@@ -319,15 +290,37 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_gyro(imu_float3_t *out)
 
 	return BIODYN_IMU_OK;
 }
+// read accel data function
+biodyn_imu_err_t biodyn_imu_icm20948_read_accel(imu_int_16_3_t *out)
+{
+	ESP_LOGI(TAG, "Reading accel data");
+	uint8_t tx_data[7];
+	tx_data[0] = ACCEL_XOUT_H | 0x80;
+	uint8_t rx_data[7];
 
-// Reads and returns accelerometer data
-// biodyn_imu_err_t biodyn_imu_icm20948_read_accel(imu_float3_t *out)
-//{
-//	// TODO: implement!
-//
-//	return BIODYN_IMU_OK;
-//}
+	spi_transaction_t trans = {
+		.length = (8 * 7),
+		.rxlength = (8 * 7),
+		.tx_buffer = &tx_data,
+		.rx_buffer = &rx_data,
+	};
 
+	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
+	if (err != ESP_OK)
+	{
+		ESP_LOGE(TAG, "Failed to transmit data over SPI (reading accelerometer)");
+		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
+	}
+
+	ESP_LOGI(TAG, "GOT OUTPUT BUFFER: %x, %x, %x, %x, %x, %x, %x",
+			 rx_data[0], rx_data[1], rx_data[2], rx_data[3], rx_data[4], rx_data[5], rx_data[6]);
+
+	out->x = ((int16_t)rx_data[1] << 8) + rx_data[2];
+	out->y = ((int16_t)rx_data[3] << 8) + rx_data[4];
+	out->z = ((int16_t)rx_data[5] << 8) + rx_data[6];
+	ESP_LOGI(TAG, "READ: accel_x = %x, accel_y = %x, accel_z = %x", out->x, out->y, out->z);
+	return BIODYN_IMU_OK;
+}
 // reads and returns compass data
 biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out)
 {
