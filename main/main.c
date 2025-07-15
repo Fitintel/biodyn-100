@@ -75,19 +75,3 @@ void app_main(void)
 		vTaskDelay(pdMS_TO_TICKS(100));
 	}
 }
-
-
-/**
- *
- * USER BANK TEST R/W BELOW
-uint8_t initial_bank_value = 7;
-get_user_bank(&initial_bank_value);
-ESP_LOGI(MAIN_TAG, "Read user bank as %d", initial_bank_value);
-
-uint8_t write_bank_value = 0;
-select_user_bank(write_bank_value);
-ESP_LOGI(MAIN_TAG, "Wrote user bank as %d", write_bank_value);
-
-get_user_bank(&initial_bank_value);
-ESP_LOGI(MAIN_TAG, "Read user bank as %d", initial_bank_value);
-*/

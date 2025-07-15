@@ -73,7 +73,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	read_single_register(0, USER_CTRL, &user_ctl_out);
 	if (user_ctl != user_ctl_out)
 	{
-		ESP_LOGE(TAG, "Failed to write user bank: Wrote %x, got %x", user_ctl, user_ctl_out);
+		ESP_LOGE(TAG, "Failed to write user control: Wrote %x, got %x", user_ctl, user_ctl_out);
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
 
@@ -91,7 +91,7 @@ biodyn_imu_err_t select_user_bank(uint8_t bank)
 	// only bits [5:4] are for user bank select, rest are reserved
 	// 0x30 -> 00110000 (see datasheet page 67)
 	uint8_t tx_data[2] = {REG_BANK_SEL | WRITE_MSB,
-						  (bank << 4) & 0x30};		
+						  (bank << 4) & 0x30};
 
 	// length 2 (bytes) = max{rx_data length, tx_data length}
 	spi_transaction_t trans = {
@@ -231,45 +231,14 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel(imu_int_16_3_t *out)
 	return BIODYN_IMU_OK;
 }
 
-biodyn_imu_err_t biodyn_imu_icm20948_read_user_ctrl()
+biodyn_imu_err_t self_test_whoami()
 {
-	ESP_LOGI(TAG, "Reading user_ctrl");
-	uint8_t tx_data[2];
-	tx_data[0] = 0x03 | 0x80;
-	uint8_t rx_data[2];
-
-	spi_transaction_t trans = {
-		.length = (8 * 1),
-		.rxlength = (8 * 1),
-		.tx_buffer = &tx_data,
-		.rx_buffer = &rx_data,
-	};
-
-	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
-	if (err != ESP_OK)
-	{
-		ESP_LOGE(TAG, "Failed to transmit data over SPI (reading accelerometer)");
-		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
-	}
-
-	ESP_LOGI(TAG, "Read user_ctrl as %x", rx_data[1]);
-
-	return BIODYN_IMU_OK;
-}
-
-// Self-test function
-biodyn_imu_err_t biodyn_imu_icm20948_self_test()
-{
-	ESP_LOGI(TAG, "Running self test");
-
-	// Send who am i message
-
 	uint8_t tx_data[2] = {READ_MSB | IMU_WHOAMI, 0x0}; // {read, WHO_AM_I}
 	uint8_t rx_data[2] = {0x0, 0x0};				   // Recieved
 
 	spi_transaction_t trans = {
-		.length = 16,
-		.rxlength = 16,
+		.length = 8 * 2,
+		.rxlength = 8 * 2,
 		.tx_buffer = &tx_data,
 		.rx_buffer = &rx_data,
 	};
@@ -281,13 +250,62 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
 	}
 
-	// Check that WHOAMI value is the same
 	if (rx_data[1] != 0xEA)
 	{
 		ESP_LOGE(TAG, "Got wrong WHOAMI response: %x", rx_data[1]);
 		return BIODYN_IMU_ERR_WRONG_WHOAMI;
 	}
-	ESP_LOGI(TAG, "Got correct WHOAMI response: %x", rx_data[1]);
+
+	ESP_LOGI(TAG, "\tGot correct WHOAMI response: %x", rx_data[1]);
+
+	return BIODYN_IMU_OK;
+}
+biodyn_imu_err_t self_test_user_banks()
+{
+	biodyn_imu_err_t err = 0;
+
+	// Write non-zero
+	uint8_t write_bank_value = 2;
+	if ((err = select_user_bank(write_bank_value)))
+		return err;
+
+	// Verify written as non-zero
+	uint8_t initial_bank_value = 0;
+	if ((err = get_user_bank(&initial_bank_value)))
+		return err;
+	if (initial_bank_value != write_bank_value)
+	{
+		ESP_LOGE(TAG, "Failed to write IMU user bank: Tried to write %d got %d",
+				 write_bank_value, initial_bank_value);
+		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
+	}
+
+	// Write 0 - restore default
+	write_bank_value = 0;
+	if ((err = select_user_bank(write_bank_value)))
+		return err;
+
+	ESP_LOGI(TAG, "\tUser banks OK");
+	return BIODYN_IMU_OK;
+}
+
+// Self-test function
+biodyn_imu_err_t biodyn_imu_icm20948_self_test()
+{
+	ESP_LOGI(TAG, "Running self test");
+
+	biodyn_imu_err_t err;
+
+	// Check that WHOAMI value is the same
+	if ((err = self_test_whoami()))
+	{
+		ESP_LOGE(TAG, "Self test failed - whoami (%x)", err);
+	}
+	// Check that user bank selection works
+	if ((err = self_test_user_banks()))
+	{
+		ESP_LOGE(TAG, "Self test failed - user banks (%x)", err);
+	}
 
 	// TODO: Use chip's actual self-test now
 
