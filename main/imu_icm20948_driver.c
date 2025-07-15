@@ -88,11 +88,10 @@ biodyn_imu_err_t select_user_bank(uint8_t bank)
 	if (bank > 3)
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
 
-	// Send address with MSB as the write bit (0)
-	uint8_t tx_data[2];
-	tx_data[0] = REG_BANK_SEL | WRITE_MSB; // 0x7F
-	// Write bank number
-	tx_data[1] = (bank << 4) & 0x30; // only bits [5:4] are for user bank select, rest are reserved
+	// only bits [5:4] are for user bank select, rest are reserved
+	// 0x30 -> 00110000 (see datasheet page 67)
+	uint8_t tx_data[2] = {REG_BANK_SEL | WRITE_MSB,
+						  (bank << 4) & 0x30};		
 
 	// length 2 (bytes) = max{rx_data length, tx_data length}
 	spi_transaction_t trans = {
