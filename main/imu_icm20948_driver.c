@@ -84,19 +84,24 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 
 biodyn_imu_err_t select_user_bank(uint8_t bank)
 {
+	// Check if bank is valid: range of [0, 3]
 	if (bank > 3)
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
 
+	// Send address with MSB as the write bit (0)
 	uint8_t tx_data[2];
 	tx_data[0] = REG_BANK_SEL | WRITE_MSB; // 0x7F
-	tx_data[1] = (bank << 4) & 0x30;	   // only bits [5:4] are for user bank select, rest are reserved
+	// Write bank number
+	tx_data[1] = (bank << 4) & 0x30; // only bits [5:4] are for user bank select, rest are reserved
 
+	// length 2 (bytes) = max{rx_data length, tx_data length}
 	spi_transaction_t trans = {
 		.length = 8 * 2,
 		.tx_buffer = tx_data,
 		.rx_buffer = NULL,
 	};
 
+	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 	{
@@ -104,53 +109,69 @@ biodyn_imu_err_t select_user_bank(uint8_t bank)
 		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
 	}
 
+	// Successful write, all clear
 	return BIODYN_IMU_OK;
 }
 
 biodyn_imu_err_t get_user_bank(uint8_t *bank_out)
 {
+	// Pointer must be valid
 	if (!bank_out)
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
-
+	// Send address of bank with MSB as the read bit (1)
 	uint8_t tx_data[2] = {REG_BANK_SEL | READ_MSB, 0x00};
+	// Receiving byte array (must be > than minimum non trivial length of tx_data)
 	uint8_t rx_data[2] = {0};
 
+	// length 2 (bytes) = max{rx_data length, tx_data length}
 	spi_transaction_t trans = {
 		.length = 8 * 2,
 		.tx_buffer = tx_data,
 		.rx_buffer = rx_data,
 	};
 
+	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 		return err;
 
-	// rx_data[1] contains read  and rx[0] is dummy garbage
-	*bank_out = (rx_data[1] >> 4) & 0x03; // mask for only bits [5:4]
+	// rx[0] is dummy garbage
+	// rx_data[1] contains read data
+	*bank_out = (rx_data[1] >> 4) & 0x03; // shift back out and mask for only bits [5:4]
 
+	// Successful write, all clear
 	return BIODYN_IMU_OK;
 }
 
 biodyn_imu_err_t read_single_register(uint8_t bank, uint16_t register_address, uint8_t *out)
 {
+	// Ensure valid pointer
 	if (!out)
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
+
+	// Identify user bank before selecting register details
 	select_user_bank(bank);
+	// Send user inputted register addres with MSB as the read bit (1)
 	uint8_t tx_data[2] = {register_address | READ_MSB, 0x00};
+	// Empty receiving byte array
 	uint8_t rx_data[2] = {0};
 
+	// length 2 (bytes) = max{rx_data length, tx_data length}
 	spi_transaction_t trans = {
 		.length = 8 * 2,
 		.tx_buffer = tx_data,
 		.rx_buffer = rx_data,
 	};
 
+	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 		return err;
 
 	// rx_data[1] contains read  and rx[0] is dummy garbage
 	*out = rx_data[1];
+
+	// Successful write, all clear
 	return BIODYN_IMU_OK;
 }
 
@@ -158,22 +179,24 @@ biodyn_imu_err_t write_single_register(uint8_t bank, uint16_t register_address, 
 {
 	// Select user bank to write to
 	select_user_bank(bank);
-	
-	// Use input register address with WRITE_MSB, with write data as second argument
-	uint8_t tx_data[3] = {register_address | WRITE_MSB, write_data, 0};
-	// Receiving data array
-	int8_t rx_data[3] = {0, 0, 0};
 
-	// SPI Transaction 
+	// Use input register address OR with WRITE_MSB (0), with write data as second argument
+	uint8_t tx_data[2] = {register_address | WRITE_MSB, write_data};
+	// Receiving data array
+	int8_t rx_data[2] = {0, 0};
+
+	// length 2 (bytes) = max{rx_data length, tx_data length}
 	spi_transaction_t trans = {
-		.length = 8 * 3,
+		.length = 8 * 2,
 		.tx_buffer = tx_data,
 		.rx_buffer = rx_data,
 	};
-	// result in 
+	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 		return err;
+
+	// Successful write, all clear
 	return BIODYN_IMU_OK;
 }
 
@@ -231,98 +254,6 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_user_ctrl()
 	}
 
 	ESP_LOGI(TAG, "Read user_ctrl as %x", rx_data[1]);
-
-	return BIODYN_IMU_OK;
-}
-
-biodyn_imu_err_t biodyn_imu_icm20948_run_accel_test()
-{
-	return biodyn_imu_icm20948_read_x_accel() | biodyn_imu_icm20948_read_y_accel() | biodyn_imu_icm20948_read_z_accel();
-}
-
-biodyn_imu_err_t biodyn_imu_icm20948_read_x_accel()
-{
-	ESP_LOGI(TAG, "Reading x accel");
-	uint8_t tx_data[3];
-	tx_data[0] = ACCEL_XOUT_H | 0x80;
-	uint8_t rx_data[3];
-
-	spi_transaction_t trans = {
-		.length = (8 * 2),
-		.rxlength = (8 * 2),
-		.tx_buffer = &tx_data,
-		.rx_buffer = &rx_data,
-	};
-
-	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
-	if (err != ESP_OK)
-	{
-		ESP_LOGE(TAG, "Failed to transmit data over SPI (reading accelerometer)");
-		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
-	}
-
-	ESP_LOGI(TAG, "Read x accel rx_data[0] as %x", rx_data[0]);
-	ESP_LOGI(TAG, "Read x accel rx_data[1] as %x", rx_data[1]);
-	ESP_LOGI(TAG, "Read x accel rx_data[2] as %x", rx_data[2]);
-	ESP_LOGI(TAG, "Read x accel rx_data total as %x", rx_data[1] << 8 | rx_data[2]);
-
-	return BIODYN_IMU_OK;
-}
-
-biodyn_imu_err_t biodyn_imu_icm20948_read_y_accel()
-{
-	ESP_LOGI(TAG, "Reading y accel");
-	uint8_t tx_data[3];
-	tx_data[0] = ACCEL_YOUT_H | 0x80;
-	uint8_t rx_data[3];
-
-	spi_transaction_t trans = {
-		.length = (8 * 2),
-		.rxlength = (8 * 2),
-		.tx_buffer = &tx_data,
-		.rx_buffer = &rx_data,
-	};
-
-	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
-	if (err != ESP_OK)
-	{
-		ESP_LOGE(TAG, "Failed to transmit data over SPI (reading accelerometer)");
-		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
-	}
-
-	ESP_LOGI(TAG, "Read y accel rx_data[0] as %x", rx_data[0]);
-	ESP_LOGI(TAG, "Read y accel rx_data[1] as %x", rx_data[1]);
-	ESP_LOGI(TAG, "Read y accel rx_data[2] as %x", rx_data[2]);
-	ESP_LOGI(TAG, "Read y accel rx_data total as %x", rx_data[1] << 8 | rx_data[2]);
-
-	return BIODYN_IMU_OK;
-}
-
-biodyn_imu_err_t biodyn_imu_icm20948_read_z_accel()
-{
-	ESP_LOGI(TAG, "Reading z accel");
-	uint8_t tx_data[3];
-	tx_data[0] = ACCEL_ZOUT_H | 0x80;
-	uint8_t rx_data[3];
-
-	spi_transaction_t trans = {
-		.length = (8 * 2),
-		.rxlength = (8 * 2),
-		.tx_buffer = &tx_data,
-		.rx_buffer = &rx_data,
-	};
-
-	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
-	if (err != ESP_OK)
-	{
-		ESP_LOGE(TAG, "Failed to transmit data over SPI (reading accelerometer)");
-		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
-	}
-
-	ESP_LOGI(TAG, "Read z accel rx_data[0] as %x", rx_data[0]);
-	ESP_LOGI(TAG, "Read z accel rx_data[1] as %x", rx_data[1]);
-	//		ESP_LOGI(TAG, "Read z accel rx_data[2] as %x", rx_data[2]);
-	ESP_LOGI(TAG, "Read z accel rx_data total as %x", rx_data[0] << 8 | rx_data[1]);
 
 	return BIODYN_IMU_OK;
 }
