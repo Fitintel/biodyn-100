@@ -185,6 +185,7 @@ biodyn_imu_err_t write_single_register(uint8_t bank, uint16_t register_address, 
 	spi_transaction_t trans = {
 		.length = 8 * 2,
 		.tx_buffer = tx_data,
+		.rx_buffer = NULL,
 	};
 	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
