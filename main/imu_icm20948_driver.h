@@ -7,7 +7,8 @@
 
 #define TAG "IMU_ICM20948"
 
-typedef struct {
+typedef struct
+{
 	int16_t accel_x;
 	int16_t accel_y;
 	int16_t accel_z;
@@ -57,10 +58,11 @@ struct imu_int_16
 	int16_t y;
 	int16_t z;
 };
-typedef struct imu_int_16 imu_int_16_3_t; //for testing
+typedef struct imu_int_16 imu_int_16_3_t; // for testing
 
 // i2c pins for a device
-struct i2c_config {
+struct i2c_config
+{
 	uint8_t mosi;
 	uint8_t miso;
 	uint8_t sclk;
@@ -87,14 +89,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_init();
 // Performs an IMU self-test
 biodyn_imu_err_t biodyn_imu_icm20948_self_test();
 
+// Reads both accel and gyro data
+biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro();
 
-// Reads and returns gyro data
-biodyn_imu_err_t biodyn_imu_icm20948_read_gyro(imu_float3_t *out);
-
-// Reads and returns accelerometer data
-biodyn_imu_err_t biodyn_imu_icm20948_read_accel(imu_int_16_3_t *out);
-
-// reads and returns compass data
+// Reads and returns compass data
 biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out);
 
 biodyn_imu_err_t biodyn_imu_icm20948_read_user_ctrl();
@@ -103,6 +101,5 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_z_accel();
 biodyn_imu_err_t biodyn_imu_icm20948_read_y_accel();
 biodyn_imu_err_t biodyn_imu_icm20948_read_x_accel();
 biodyn_imu_err_t biodyn_imu_icm20948_run_accel_test();
-
 
 #endif // ICM20948_DRIVER_H
