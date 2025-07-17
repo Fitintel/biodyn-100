@@ -61,17 +61,16 @@ void app_main(void)
 		ESP_LOGE(MAIN_TAG, "Failed to initialize Bluetooth in %s, err code %x", __func__, err);
 		return;
 	}
-
+	uint16_t output;
 	for (;;)
 	{
-		// imu_int_16_3_t out = { .0, .0, .0 };
-		// if ((err = biodyn_imu_icm20948_read_accel(&out)))
-		// {
-		// 	ESP_LOGE(MAIN_TAG, "Failed to read gyro accel: %x", err);
-		// }
-		// ESP_LOGI(MAIN_TAG, "Got accel: %d, %d, %d", out.x, out.y, out.z);
-		// biodyn_imu_icm20948_self_test();
-
-		vTaskDelay(pdMS_TO_TICKS(100));
+		// vTaskDelay(pdMS_TO_TICKS(100));
+		err = self_test_accel(&output);
+		if (err != BIODYN_IMU_OK)
+		{
+			ESP_LOGE(MAIN_TAG, "ERROR READING IMU ICM20948 DATA");
+			continue;
+		}
+		ESP_LOGI(MAIN_TAG, "GOT X ACCEL LOW AS %d", output);
 	}
 }

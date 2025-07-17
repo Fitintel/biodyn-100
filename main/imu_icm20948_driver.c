@@ -21,13 +21,13 @@ static struct
 };
 
 // Sets the user bank of registers
-biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank);
+static biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank);
 // Reads the user bank of registers
-biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out);
+static biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out);
 // Writes data to a single register specified by a bank and address to the IMU
-biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data);
+static biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data);
 // Reads data of a single register specified by a bank and address of the IMU
-biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_address, uint8_t *out);
+static biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_address, uint8_t *out);
 
 // Initializes the IMU
 biodyn_imu_err_t biodyn_imu_icm20948_init()
@@ -92,11 +92,19 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	user_ctrl_data |= 0x10;
 	biodyn_imu_icm20948_write_reg(_b2, USER_CTRL, user_ctrl_data);
 
-	// set bank 0 to get readings
+	// Set bank 0 to get readings
 	biodyn_imu_icm20948_set_user_bank(_b0);
 
+	// Delay to wait for power up
+	vTaskDelay(pdMS_TO_TICKS(100));
+
+	// Wake up all sensors
+	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
+
+	// Self test to ensure proper functionality
 	biodyn_imu_icm20948_self_test();
-	// Ok.
+
+	// Successful init, all clear
 	ESP_LOGI(TAG, "Initialized IMU");
 	return BIODYN_IMU_OK;
 }
@@ -308,7 +316,18 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	return BIODYN_IMU_OK;
 }
 
-biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro()
+biodyn_imu_err_t self_test_accel(uint16_t *out)
+{
+	uint8_t low;
+	uint8_t high;
+	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_L, &low);
+	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_H, &high);
+	*out = ((uint16_t)high << 8) | low;
+
+	return BIODYN_IMU_OK;
+}
+
+biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data)
 {
 	return BIODYN_IMU_OK;
 }

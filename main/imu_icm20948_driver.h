@@ -15,9 +15,9 @@ typedef struct
 	int16_t gyro_x;
 	int16_t gyro_y;
 	int16_t gyro_z;
-	int16_t mag_x;
-	int16_t mag_y;
-	int16_t mag_z;
+	// int16_t mag_x;
+	// int16_t mag_y;
+	// int16_t mag_z;
 } imu_motion_data;
 
 typedef enum
@@ -92,14 +92,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test();
 // Reads both accel and gyro data
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro();
 
+// TEMPORARY test to work out accel gyro multibyte reading
+biodyn_imu_err_t self_test_accel(uint16_t *out);
+
 // Reads and returns compass data
 biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out);
 
 biodyn_imu_err_t biodyn_imu_icm20948_read_user_ctrl();
-
-biodyn_imu_err_t biodyn_imu_icm20948_read_z_accel();
-biodyn_imu_err_t biodyn_imu_icm20948_read_y_accel();
-biodyn_imu_err_t biodyn_imu_icm20948_read_x_accel();
-biodyn_imu_err_t biodyn_imu_icm20948_run_accel_test();
 
 #endif // ICM20948_DRIVER_H
