@@ -2,6 +2,7 @@
 #define IMU_ICM20948_CONSTANTS
 
 #define IMU_WHOAMI 0x0
+#define LP_CONFIG 0x05
 #define ACCEL_XOUT_H 0x2d
 #define ACCEL_XOUT_L 0x2e
 #define ACCEL_YOUT_H 0x2f
@@ -39,7 +40,7 @@
 #define READ_MSB 0x80
 #define WRITE_MSB 0x00
 
-#define ACCEL_RANGE_VALUE _accel_4g
+#define ACCEL_RANGE_VALUE _accel_8g
 #define GYRO_RANGE_VALUE _gyro_1000dps
 
 #endif // IMU_ICM20948_CONSTANTS

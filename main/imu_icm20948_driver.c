@@ -93,13 +93,18 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	biodyn_imu_icm20948_write_reg(_b2, USER_CTRL, user_ctrl_data);
 
 	// Set bank 0 to get readings
-	biodyn_imu_icm20948_set_user_bank(_b0);
+	// biodyn_imu_icm20948_set_user_bank(_b0);
 
 	// Delay to wait for power up
 	vTaskDelay(pdMS_TO_TICKS(100));
 
 	// Wake up all sensors
 	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
+
+	// Turn off low power mode
+	biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
+	// ERROR: Retry turning off sleep mode of icm20948
+	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
 	// Self test to ensure proper functionality
 	biodyn_imu_icm20948_self_test();
@@ -337,4 +342,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out)
 	// TODO: implement!
 
 	return BIODYN_IMU_OK;
+}
+
+// TEST FUNCTION
+// Read from a bank and register of the IMU
+// TO BE REMOVED ONCE TESTING IS DONE
+biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out)
+{
+	return biodyn_imu_icm20948_read_reg(bank, register_address, out);
 }

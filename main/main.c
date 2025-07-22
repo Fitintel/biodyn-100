@@ -3,20 +3,13 @@
 #include <string.h>
 #include <inttypes.h>
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
-#include "freertos/semphr.h"
+// #include "freertos/task.h"
+// #include "freertos/event_groups.h"
+// #include "freertos/semphr.h"
 #include <unistd.h>
 
 #include "esp_system.h"
 #include "esp_log.h"
-#include "esp_bt.h"
-#include "esp_gap_ble_api.h"
-#include "esp_gatts_api.h"
-#include "esp_bt_defs.h"
-#include "esp_bt_main.h"
-#include "esp_bt_device.h"
-#include "esp_gatt_common_api.h"
 #include "esp_timer.h"
 
 #include "sdkconfig.h"
@@ -26,6 +19,9 @@
 #include "ble.h"
 #include "ble_profiles.h"
 #include "imu_icm20948_driver.h"
+
+void test_accel_imu_icm20948();
+void test_all_registers_imu_icm20948();
 
 // APP ENTRY POINT
 void app_main(void)
@@ -61,8 +57,26 @@ void app_main(void)
 		ESP_LOGE(MAIN_TAG, "Failed to initialize Bluetooth in %s, err code %x", __func__, err);
 		return;
 	}
+	test_accel_imu_icm20948();
+}
+
+void test_accel_imu_icm20948()
+{
+	esp_err_t err;
 	uint16_t output;
-	for (;;)
+
+	// vTaskDelay(pdMS_TO_TICKS(100));
+	err = self_test_accel(&output);
+	if (err != BIODYN_IMU_OK)
+	{
+		ESP_LOGE(MAIN_TAG, "ERROR READING IMU ICM20948 DATA");
+	}
+	else
+	{
+		ESP_LOGI(MAIN_TAG, "GOT X ACCEL LOW AS %d", output);
+	}
+
+	for (int i = 0; i < 20000; ++i)
 	{
 		// vTaskDelay(pdMS_TO_TICKS(100));
 		err = self_test_accel(&output);
@@ -72,5 +86,23 @@ void app_main(void)
 			continue;
 		}
 		ESP_LOGI(MAIN_TAG, "GOT X ACCEL LOW AS %d", output);
+		vTaskDelay(pdMS_TO_TICKS(200)); // Sleep for 1000 ms (1 second)
 	}
+	return;
+}
+
+// Test for all addresses to see readable registers by non-zero values
+void test_all_registers_imu_icm20948()
+{
+	uint8_t out;
+	for (uint8_t address = 0; address < 116; ++address)
+	{
+		if (biodyn_imu_icm20948_read_register_test(0x00, address, &out))
+		{
+			ESP_LOGE(MAIN_TAG, "FAILED to read register %x", address);
+			continue;
+		}
+		ESP_LOGI(MAIN_TAG, "TESTED address %x with read value: %x", address, out);
+	}
+	return;
 }

@@ -98,6 +98,8 @@ biodyn_imu_err_t self_test_accel(uint16_t *out);
 // Reads and returns compass data
 biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out);
 
-biodyn_imu_err_t biodyn_imu_icm20948_read_user_ctrl();
+// biodyn_imu_err_t biodyn_imu_icm20948_read_user_ctrl();
+
+biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out);
 
 #endif // ICM20948_DRIVER_H
