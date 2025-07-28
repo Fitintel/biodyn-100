@@ -5,16 +5,17 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 
-#define TAG "IMU_ICM20948"
+#define IMU_ACCEL_UNIT "m/s^2"
+#define IMU_GYRO_UNIT "dps"
 
 typedef struct
 {
-	int16_t accel_x;
-	int16_t accel_y;
-	int16_t accel_z;
-	int16_t gyro_x;
-	int16_t gyro_y;
-	int16_t gyro_z;
+	float accel_x;
+	float accel_y;
+	float accel_z;
+	float gyro_x;
+	float gyro_y;
+	float gyro_z;
 	// int16_t mag_x;
 	// int16_t mag_y;
 	// int16_t mag_z;
@@ -52,14 +53,6 @@ struct imu_float3
 };
 typedef struct imu_float3 imu_float3_t;
 
-struct imu_int_16
-{
-	int16_t x;
-	int16_t y;
-	int16_t z;
-};
-typedef struct imu_int_16 imu_int_16_3_t; // for testing
-
 // i2c pins for a device
 struct i2c_config
 {
@@ -90,10 +83,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_init();
 biodyn_imu_err_t biodyn_imu_icm20948_self_test();
 
 // Reads both accel and gyro data
-biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro();
+biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data);
 
 // TEMPORARY test to work out accel gyro multibyte reading
-biodyn_imu_err_t self_test_accel(uint16_t *out);
+biodyn_imu_err_t self_test_accel(int16_t *out);
 
 // Reads and returns compass data
 biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out);

@@ -4,7 +4,11 @@
 #include "hal/spi_types.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
+#include "math.h"
+#include "string.h"
 
+#define ACCEL_SENSITIVITY_SCALE_FACTOR (1 << (14 - ACCEL_RANGE_VALUE))
+#define GYRO_SENSITIVITY_SCALE_FACTOR 16.4 * (1 << (3 - GYRO_RANGE_VALUE));
 // IMU driver data
 static struct
 {
@@ -28,6 +32,39 @@ static biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out);
 static biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data);
 // Reads data of a single register specified by a bank and address of the IMU
 static biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_address, uint8_t *out);
+
+// TEST
+biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out)
+{
+	// Ensure valid pointer
+	if (!out)
+		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
+
+	// Identify user bank before selecting register details
+	biodyn_imu_icm20948_set_user_bank(bank);
+	// Send user inputted register addres with MSB as the read bit (1)
+	uint8_t tx_data[2] = {register_address | READ_MSB, 0x00};
+	// Empty receiving byte array
+	uint8_t rx_data[2] = {0};
+
+	// length 2 (bytes) = max{rx_data length, tx_data length}
+	spi_transaction_t trans = {
+		.length = 8 * 2,
+		.tx_buffer = tx_data,
+		.rx_buffer = rx_data,
+	};
+
+	// SPI TRANSACTION
+	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
+	if (err != ESP_OK)
+		return err;
+
+	// rx_data[1] contains read  and rx[0] is dummy garbage
+	*out = rx_data[1];
+
+	// Successful write, all clear
+	return BIODYN_IMU_OK;
+}
 
 // Initializes the IMU
 biodyn_imu_err_t biodyn_imu_icm20948_init()
@@ -62,12 +99,16 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
 	}
 
-	// TODO: implement
 	// INITIALIZATION PROCEDURE
 	// Reset IMU
-	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0xc1);
+	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x81);
 
 	// Exit from sleep and select clock 37
+	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+
+	// Turn off low power mode
+	biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
+	// ERROR: Retry turning off sleep mode of icm20948
 	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
 	// Align output data rate
@@ -204,6 +245,43 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_ad
 	// Successful write, all clear
 	return BIODYN_IMU_OK;
 }
+
+biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(uint8_t bank, uint16_t register_address, uint8_t *out, uint8_t length)
+{
+	// Invalid pointer throws an error
+	if (!out || length == 0)
+		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
+
+	biodyn_imu_icm20948_set_user_bank(bank);
+	uint8_t *tx_data = malloc(sizeof(uint8_t) * (length + 1));
+	tx_data[0] = register_address | READ_MSB;
+	uint8_t *rx_data = malloc(sizeof(uint8_t) * (length + 1));
+
+	// length 2 (bytes) = max{rx_data length, tx_data length}
+	spi_transaction_t trans = {
+		.length = 8 * (length + 1),
+		.tx_buffer = tx_data,
+		.rx_buffer = rx_data,
+	};
+
+	// SPI TRANSACTION
+	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
+	if (err != ESP_OK)
+	{
+		free(tx_data);
+		free(rx_data);
+		return err;
+	}
+
+	// rx_data[1] contains read  and rx[0] is dummy garbage
+	// out = rx_data;
+	memcpy(out, rx_data + 1, length);
+	free(tx_data);
+	free(rx_data);
+	// Successful write, all clear
+	return BIODYN_IMU_OK;
+}
+
 biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data)
 {
 	// Select user bank to write to
@@ -321,19 +399,42 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	return BIODYN_IMU_OK;
 }
 
-biodyn_imu_err_t self_test_accel(uint16_t *out)
+biodyn_imu_err_t self_test_accel(int16_t *out)
 {
 	uint8_t low;
 	uint8_t high;
 	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_L, &low);
 	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_H, &high);
-	*out = ((uint16_t)high << 8) | low;
-
+	*out = ((int16_t)high << 8) | low;
+	*out *= (9.81 / 4096);
 	return BIODYN_IMU_OK;
 }
 
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data)
 {
+	uint8_t out_length = 12;
+	uint8_t *out = malloc(sizeof(uint8_t) * out_length);
+
+	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
+
+	// Byte shifting for full high and low register with proper endianness
+	int16_t raw_ax = (int16_t)((out[0] << 8) | out[1]);
+	int16_t raw_ay = (int16_t)((out[2] << 8) | out[3]);
+	int16_t raw_az = (int16_t)((out[4] << 8) | out[5]);
+	int16_t raw_gx = (int16_t)((out[6] << 8) | out[7]);
+	int16_t raw_gy = (int16_t)((out[8] << 8) | out[9]);
+	int16_t raw_gz = (int16_t)((out[10] << 8) | out[11]);
+
+	data->accel_x = ((float)raw_ax / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
+	data->accel_y = ((float)raw_ay / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
+	data->accel_z = ((float)raw_az / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
+
+	data->gyro_x = (float)raw_gx / GYRO_SENSITIVITY_SCALE_FACTOR;
+	data->gyro_y = (float)raw_gy / GYRO_SENSITIVITY_SCALE_FACTOR;
+	data->gyro_z = (float)raw_gz / GYRO_SENSITIVITY_SCALE_FACTOR;
+
+	ESP_LOGI(TAG, "accel factor should be 16384 was %d", ACCEL_SENSITIVITY_SCALE_FACTOR);
+	free(out);
 	return BIODYN_IMU_OK;
 }
 // Reads and returns compass data
@@ -342,12 +443,4 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out)
 	// TODO: implement!
 
 	return BIODYN_IMU_OK;
-}
-
-// TEST FUNCTION
-// Read from a bank and register of the IMU
-// TO BE REMOVED ONCE TESTING IS DONE
-biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out)
-{
-	return biodyn_imu_icm20948_read_reg(bank, register_address, out);
 }

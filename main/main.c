@@ -22,6 +22,7 @@
 
 void test_accel_imu_icm20948();
 void test_all_registers_imu_icm20948();
+void test_accel_gyro_imu_icm20948();
 
 // APP ENTRY POINT
 void app_main(void)
@@ -57,13 +58,15 @@ void app_main(void)
 		ESP_LOGE(MAIN_TAG, "Failed to initialize Bluetooth in %s, err code %x", __func__, err);
 		return;
 	}
-	test_accel_imu_icm20948();
+	test_all_registers_imu_icm20948();
+	// test_accel_imu_icm20948();
+	test_accel_gyro_imu_icm20948();
 }
 
 void test_accel_imu_icm20948()
 {
 	esp_err_t err;
-	uint16_t output;
+	int16_t output;
 
 	// vTaskDelay(pdMS_TO_TICKS(100));
 	err = self_test_accel(&output);
@@ -85,8 +88,8 @@ void test_accel_imu_icm20948()
 			ESP_LOGE(MAIN_TAG, "ERROR READING IMU ICM20948 DATA");
 			continue;
 		}
-		ESP_LOGI(MAIN_TAG, "GOT X ACCEL LOW AS %d", output);
-		vTaskDelay(pdMS_TO_TICKS(200)); // Sleep for 1000 ms (1 second)
+		ESP_LOGI(MAIN_TAG, "GOT X ACCEL AS %d %s", output, IMU_ACCEL_UNIT);
+		vTaskDelay(pdMS_TO_TICKS(100)); // Sleep for 1000 ms (1 second)
 	}
 	return;
 }
@@ -95,14 +98,63 @@ void test_accel_imu_icm20948()
 void test_all_registers_imu_icm20948()
 {
 	uint8_t out;
-	for (uint8_t address = 0; address < 116; ++address)
+	// BANK 0
+	for (uint8_t address = 0x00; address < 0x7f; ++address)
 	{
-		if (biodyn_imu_icm20948_read_register_test(0x00, address, &out))
+		if (biodyn_imu_icm20948_read_register_test(_b0, address, &out))
 		{
-			ESP_LOGE(MAIN_TAG, "FAILED to read register %x", address);
+			ESP_LOGE(MAIN_TAG, "FAILED to read bank %d, register %x", _b0 / 16, address);
 			continue;
 		}
-		ESP_LOGI(MAIN_TAG, "TESTED address %x with read value: %x", address, out);
+		ESP_LOGI(MAIN_TAG, "TESTED bank %d, address %x with read value: %x", _b0 / 16, address, out);
 	}
+	// BANK 1
+	for (uint8_t address = 0x02; address < 0x28; ++address)
+	{
+		if (biodyn_imu_icm20948_read_register_test(_b1, address, &out))
+		{
+			ESP_LOGE(MAIN_TAG, "FAILED to read bank %d, register %x", _b1 / 16, address);
+			continue;
+		}
+		ESP_LOGI(MAIN_TAG, "TESTED bank %d, address %x with read value: %x", _b1 / 16, address, out);
+	}
+	// BANK 2
+	for (uint8_t address = 0x00; address < 0x15; ++address)
+	{
+		if (biodyn_imu_icm20948_read_register_test(_b2, address, &out))
+		{
+			ESP_LOGE(MAIN_TAG, "FAILED to read bank %d, register %x", _b2 / 16, address);
+			continue;
+		}
+		ESP_LOGI(MAIN_TAG, "TESTED bank %d, address %x with read value: %x", _b2 / 16, address, out);
+	}
+	// Below bank 3 not used, not checked
+	// BANK 3
+	// for (uint8_t address = 0x00; address < 0x17; ++address)
+	// {
+	// 	if (biodyn_imu_icm20948_read_register_test(_b3, address, &out))
+	// 	{
+	// 		ESP_LOGE(MAIN_TAG, "FAILED to read bank %d, register %x", _b3, address);
+	// 		continue;
+	// 	}
+	// 	ESP_LOGI(MAIN_TAG, "TESTED bank %d, address %x with read value: %x", _b3, address, out);
+	// }
+
 	return;
+}
+
+void test_accel_gyro_imu_icm20948()
+{
+	imu_motion_data data = {0};
+	for (int i = 0; i < 2000; ++i)
+	{
+		biodyn_imu_icm20948_read_accel_gyro(&data);
+		ESP_LOGI(MAIN_TAG, "ACCEL X: %.3f %s", data.accel_x, IMU_ACCEL_UNIT);
+		ESP_LOGI(MAIN_TAG, "ACCEL Y: %.3f %s", data.accel_y, IMU_ACCEL_UNIT);
+		ESP_LOGI(MAIN_TAG, "ACCEL Z: %.3f %s", data.accel_z, IMU_ACCEL_UNIT);
+		ESP_LOGI(MAIN_TAG, "GYRO X: %.3f %s", data.gyro_x, IMU_GYRO_UNIT);
+		ESP_LOGI(MAIN_TAG, "GYRO Y: %.3f %s", data.gyro_y, IMU_GYRO_UNIT);
+		ESP_LOGI(MAIN_TAG, "GYRO Z: %.3f %s", data.gyro_z, IMU_GYRO_UNIT);
+		vTaskDelay(pdMS_TO_TICKS(100)); // Sleep for 100 ms (0.1 second)
+	}
 }

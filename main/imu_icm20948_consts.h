@@ -40,7 +40,10 @@
 #define READ_MSB 0x80
 #define WRITE_MSB 0x00
 
-#define ACCEL_RANGE_VALUE _accel_8g
+#define ACCEL_RANGE_VALUE _accel_2g
 #define GYRO_RANGE_VALUE _gyro_1000dps
+
+#define TAG "IMU_ICM20948"
+#define EARTH_GRAVITY 9.80665f
 
 #endif // IMU_ICM20948_CONSTANTS
