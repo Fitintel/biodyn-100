@@ -1,7 +1,7 @@
 {
     "C_Cpp.intelliSenseEngine": "default",
     "idf.espIdfPath": "/Users/callum/esp/esp-idf",
-    "idf.pythonInstallPath": "/usr/bin/python3",
+    "idf.pythonInstallPath": "C:\\Espressif\\tools\\idf-python\\3.11.2\\python.exe",
     "idf.openOcdConfigs": [
         "board/esp32s3-builtin.cfg"
     ],
@@ -12,7 +12,11 @@
 		"esp_system.h": "c",
 		"stdint.h": "c",
 		"constants.h": "c",
-		"format": "c"
+		"format": "c",
+		"algorithm": "c",
+		"xiosbase": "c",
+		"xlocale": "c",
+		"xutility": "c"
 	},
 	"idf.flashType": "JTAG"
 }

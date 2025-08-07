@@ -1,6 +1,7 @@
-
+.project
 build/
 build_*_*/
 sdkconfig
 sdkconfig.old
-.project
+.vscode/
+.devcontainer/

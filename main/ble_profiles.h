@@ -4,6 +4,7 @@
 #include "constants.h"
 #include "ble.h"
 #include "led.h"
+#include "imu_icm20948_driver.h"
 
 static struct biodyn_ble_characteristic device_info_chars[] = {
 	{
@@ -46,23 +47,37 @@ void set_data_test(uint16_t len, void *src)
 	ESP_LOGI("PROFILES", "Tried to write \"%s\"", buf);
 }
 
+void imu_icm20948_get_state(uint16_t *len, void *dst)
+{
+	imu_motion_data data = {0};
+	biodyn_imu_icm20948_read_accel_gyro(&data);
+	*len = sizeof(imu_motion_data);
+	// Since imu_motion_data is a struct solely of floats, it can (allegedly) be directly copied for output
+	memcpy(dst, &data, *len);
+	// copying from address of imu data for its length (len)
+}
+
 static struct biodyn_ble_characteristic sensor_test_chars[] = {
-	{
-		.name = "Test Read Function",
-		.uuid = BIODYN_BLE_UUID_16(0x1234),
-		.permissions = ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-		.properties = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE,
-		.get_data = get_data_test,
-		.set_data = set_data_test
-	},
+	{.name = "Test Read Function",
+	 .uuid = BIODYN_BLE_UUID_16(0x1234),
+	 .permissions = ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+	 .properties = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE,
+	 .get_data = get_data_test,
+	 .set_data = set_data_test},
 	{
 		.name = "LED Control",
 		.uuid = BIODYN_BLE_UUID_16(0x1235),
 		.permissions = ESP_GATT_PERM_WRITE,
 		.properties = ESP_GATT_CHAR_PROP_BIT_WRITE,
 		.set_data = led_set_state,
-	}
-};
+	},
+	{
+		.name = "IMU Control",
+		.uuid = BIODYN_BLE_UUID_16(0x1236),
+		.permissions = ESP_GATT_PERM_READ,
+		.properties = ESP_GATT_CHAR_PROP_BIT_READ,
+		.get_data = imu_icm20948_get_state,
+	}};
 static struct biodyn_ble_service sensor_services[] = {
 	{
 		.name = "Test Sensor Service",
