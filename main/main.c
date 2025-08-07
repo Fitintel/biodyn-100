@@ -18,11 +18,13 @@
 #include "nvs.h"
 #include "ble.h"
 #include "ble_profiles.h"
+
 #include "imu_icm20948_driver.h"
 
 void test_accel_imu_icm20948();
 void test_all_registers_imu_icm20948();
 void test_accel_gyro_imu_icm20948();
+
 
 // APP ENTRY POINT
 void app_main(void)
@@ -58,9 +60,13 @@ void app_main(void)
 		ESP_LOGE(MAIN_TAG, "Failed to initialize Bluetooth in %s, err code %x", __func__, err);
 		return;
 	}
-	test_all_registers_imu_icm20948();
-	// test_accel_imu_icm20948();
-	test_accel_gyro_imu_icm20948();
+  
+  	// Set up!
+	ESP_LOGI(MAIN_TAG, "Finished setup");
+  
+// 	test_all_registers_imu_icm20948();
+// 	test_accel_imu_icm20948();
+// 	test_accel_gyro_imu_icm20948();
 }
 
 void test_accel_imu_icm20948()
