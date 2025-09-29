@@ -39,3 +39,14 @@ void led_set_state(uint16_t size, void *src)
 	}
 }
 
+void led_get_state(uint16_t *len, void *dst)
+{
+	uint8_t state = gpio_get_level(LED_PIN);
+	const char *on = "on";
+	const char *off = "off";
+	const char *my_data = state ? on : off;
+	*len = strlen(my_data) * sizeof(char);
+	memcpy(dst, my_data, *len);
+	ESP_LOGI("LED", "Read state as %s", my_data);
+}
+

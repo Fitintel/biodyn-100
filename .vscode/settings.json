@@ -16,7 +16,10 @@
 		"algorithm": "c",
 		"xiosbase": "c",
 		"xlocale": "c",
-		"xutility": "c"
+		"xutility": "c",
+		"imu_icm20948_driver.h": "c",
+		"chrono": "c",
+		"typeinfo": "c"
 	},
 	"idf.flashType": "JTAG"
 }
