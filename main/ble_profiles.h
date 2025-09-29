@@ -46,7 +46,6 @@ void set_data_test(uint16_t len, void *src)
 	buf[len] = '\0';
 	ESP_LOGI("PROFILES", "Tried to write \"%s\"", buf);
 }
-
 void imu_icm20948_get_state(uint16_t *len, void *dst)
 {
 	imu_motion_data data = {0};
@@ -58,18 +57,27 @@ void imu_icm20948_get_state(uint16_t *len, void *dst)
 }
 
 static struct biodyn_ble_characteristic sensor_test_chars[] = {
-	{.name = "Test Read Function",
+	{
+		.name = "Test Read Function",
 	 .uuid = BIODYN_BLE_UUID_16(0x1234),
 	 .permissions = ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
 	 .properties = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE,
 	 .get_data = get_data_test,
 	 .set_data = set_data_test},
 	{
+	
 		.name = "LED Control",
 		.uuid = BIODYN_BLE_UUID_16(0x1235),
 		.permissions = ESP_GATT_PERM_WRITE,
 		.properties = ESP_GATT_CHAR_PROP_BIT_WRITE,
 		.set_data = led_set_state,
+	},
+	{
+		.name = "LED State",
+		.uuid = BIODYN_BLE_UUID_16(0x1245),
+		.permissions = ESP_GATT_PERM_READ,
+		.properties = ESP_GATT_CHAR_PROP_BIT_READ,
+		.get_data = led_get_state,
 	},
 	{
 		.name = "IMU Control",
