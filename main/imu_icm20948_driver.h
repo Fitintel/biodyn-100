@@ -89,7 +89,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data);
 biodyn_imu_err_t self_test_accel(int16_t *out);
 
 // Reads and returns compass data
-biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out);
+biodyn_imu_err_t biodyn_imu_icm20948_read_magnetometer(imu_float3_t *out);
 
 // biodyn_imu_err_t biodyn_imu_icm20948_read_user_ctrl();
 

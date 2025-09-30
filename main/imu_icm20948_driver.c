@@ -150,6 +150,8 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// Self test to ensure proper functionality
 	biodyn_imu_icm20948_self_test();
 
+	// Initialize the magnetometer
+
 	// Successful init, all clear
 	ESP_LOGI(TAG, "Initialized IMU");
 	return BIODYN_IMU_OK;
@@ -437,10 +439,34 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data)
 	free(out);
 	return BIODYN_IMU_OK;
 }
+
+static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
+{
+	uint8_t temp;
+	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &temp);
+	temp |= 0x02;
+	// Resets the I2C master module by writing 1 to the bit
+	// this bit set should auto clear after one clock cycle
+	// (internally at 20Mhz)
+	biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, temp);
+	// Wait for bit to auto clear
+	vTaskDelay(pdMS_TO_TICKS(100));
+
+	// Enable I2C by writing 1 to bit 5 in USER_CTRL
+	// TODO: Do I need to read again here
+	// Yes, the I2C reset can change bit 4 and 5, so new read is necessary
+	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &temp);
+	temp |= 0x20;
+	// Write 1 to bit 5 in USER_CTRL
+	biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, temp);
+}
+
 // Reads and returns compass data
-biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out)
+biodyn_imu_err_t biodyn_imu_icm20948_read_magnetometer(imu_float3_t *out)
 {
 	// TODO: implement!
+	// https://www.youtube.com/watch?v=lGjwZ5NmLsU
 
+	// I2C between accel|gyro and magnetometer
 	return BIODYN_IMU_OK;
 }

@@ -46,4 +46,6 @@
 #define TAG "IMU_ICM20948"
 #define EARTH_GRAVITY 9.80665f
 
+#define MAXIMUM_BUS_SPEED 400 // khz
+
 #endif // IMU_ICM20948_CONSTANTS
