@@ -485,6 +485,17 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 // Writes into the magnetometer attached to the ICM20948
 static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
 {
+	// Set slave0 to be the built in magnetometer
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, AK09916_ADDRESS);
+	// Set the register to write to
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
+	// Set the data to write
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_DO, data);
+	// Start the write on the slave
+
+	// TODO: figure out how to send the write via I2C_SLV0_CTRL (probably)
+
+	// Might need a delay here to finish I2C transaction: TODO
 }
 
 // Reads into the magnetometer attached to the ICM20948
