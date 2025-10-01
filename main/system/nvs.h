@@ -1,7 +1,6 @@
 #ifndef BIODYN_NVS_H
 #define BIODYN_NVS_H
 
-
 #include "esp_system.h"
 #include "esp_log.h"
 #include "nvs_flash.h"

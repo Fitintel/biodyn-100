@@ -25,7 +25,8 @@
 		"ble.h": "c",
 		"esp_gap_ble_api.h": "c",
 		"math.h": "c",
-		"sdkconfig.h": "c"
+		"sdkconfig.h": "c",
+		"device_information_service.h": "c"
 	},
 	"idf.flashType": "JTAG"
 }
