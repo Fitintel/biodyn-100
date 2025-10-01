@@ -14,6 +14,30 @@ static struct biodyn_ble_characteristic device_info_chars[] = {
 		.intial_value_size = sizeof(BIODYN_MANUFACTURER_NAME),
 	},
 	{
+		.name = "Model Number String",
+		.uuid = BIODYN_BLE_UUID_16(0x2A24),
+		.permissions = ESP_GATT_PERM_READ,
+		.properties = ESP_GATT_CHAR_PROP_BIT_READ,
+		.initial_value = (void *)BIODYN_MODEL_NUMBER,
+		.intial_value_size = sizeof(BIODYN_MODEL_NUMBER),
+	},
+	{
+		.name = "Serial Number String",
+		.uuid = BIODYN_BLE_UUID_16(0x2A25),
+		.permissions = ESP_GATT_PERM_READ,
+		.properties = ESP_GATT_CHAR_PROP_BIT_READ,
+		.initial_value = (void *)BIODYN_SERIAL_NUMBER,
+		.intial_value_size = sizeof(BIODYN_SERIAL_NUMBER),
+	},
+	{
+		.name = "Hardware Revision String",
+		.uuid = BIODYN_BLE_UUID_16(0x2A27),
+		.permissions = ESP_GATT_PERM_READ,
+		.properties = ESP_GATT_CHAR_PROP_BIT_READ,
+		.initial_value = (void *)BIODYN_HARDWARE_VERSION,
+		.intial_value_size = sizeof(BIODYN_HARDWARE_VERSION),
+	},
+	{
 		.name = "Firmware Revision String",
 		.uuid = BIODYN_BLE_UUID_16(0x2A26),
 		.permissions = ESP_GATT_PERM_READ,
@@ -21,6 +45,14 @@ static struct biodyn_ble_characteristic device_info_chars[] = {
 		.initial_value = (void *)BIODYN_FIRMWARE_VERSION,
 		.intial_value_size = sizeof(BIODYN_FIRMWARE_VERSION),
 	},
+	{
+		.name = "System ID String",
+		.uuid = BIODYN_BLE_UUID_16(0x2A23),
+		.permissions = ESP_GATT_PERM_READ,
+		.properties = ESP_GATT_CHAR_PROP_BIT_READ,
+		.initial_value = (void *)BIODYN_SYSTEM_ID,
+		.intial_value_size = sizeof(BIODYN_SYSTEM_ID),
+	}
 };
 static struct biodyn_ble_service device_services[] = {
 	{
