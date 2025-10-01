@@ -43,6 +43,11 @@
 #define ACCEL_RANGE_VALUE _accel_2g
 #define GYRO_RANGE_VALUE _gyro_1000dps
 
+// Register bank 3
+#define I2C_MST_ODR_CONFIG 0x00
+#define I2C_MST_CTRL 0x01
+#define I2C_MST_DELAY_CTRL 0x02
+
 #define TAG "IMU_ICM20948"
 #define EARTH_GRAVITY 9.80665f
 

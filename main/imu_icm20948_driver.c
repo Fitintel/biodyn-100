@@ -459,6 +459,37 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 	temp |= 0x20;
 	// Write 1 to bit 5 in USER_CTRL
 	biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, temp);
+
+	// Documentation states (p. 81):
+	/*
+	 To achieve a targeted clock
+	frequency of 400 kHz, MAX, it is recommended to set I2C_MST_CLK = 7 (345.6 kHz / 46.67% duty cycle).
+	*/
+	temp = 0x07;
+	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_CTRL, temp);
+
+	// Set for a custom rate to be used for sampling the magnetometer
+	temp = 0x40;
+	biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, temp);
+	// Set data rate as 136Hz
+	// Formula: 1.1 kHz/(2^((odr_config[3:0])) )
+	temp = 0x03;
+	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_ODR_CONFIG, temp);
+
+	// Reset magnetometer
+	// Start continuous mode
+	// Both above operations require operation in the magnetometer,
+	// not just through SPI: TODO
+}
+
+// Writes into the magnetometer attached to the ICM20948
+static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
+{
+}
+
+// Reads into the magnetometer attached to the ICM20948
+static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t data)
+{
 }
 
 // Reads and returns compass data
