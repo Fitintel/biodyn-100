@@ -5,26 +5,28 @@
 #include "driver/gpio.h"
 #include <string.h>
 
-
 #define LED_PIN GPIO_NUM_7
 
-bool led_error = false;
-const char *led_error_msg = "Ok";
+static struct
+{
+	bool led_error;
+	const char *led_error_msg;
+} led_data = {false, "Ok"};
 
 void set_led_error(const char *msg)
 {
-	led_error = true;
-	led_error_msg = msg;
+	led_data.led_error = true;
+	led_data.led_error_msg = msg;
 }
 void clear_led_error()
 {
-	led_error = false;
-	led_error_msg = "Ok";
+	led_data.led_error = false;
+	led_data.led_error_msg = "Ok";
 }
 void set_and_log_led_error(const char *msg)
 {
 	set_led_error(msg);
-	ESP_LOGE("LED", "Error: %s", led_error_msg);
+	ESP_LOGE("LED", "Error: %s", led_data.led_error_msg);
 }
 
 esp_err_t biodyn_led_init()
@@ -49,9 +51,11 @@ esp_err_t biodyn_led_init()
 void led_set_state(uint16_t size, void *src)
 {
 	esp_err_t err = 0;
-	if (size != 0) {
-		uint8_t *s = (uint8_t *) src;
-		if (s[0] & 1) {
+	if (size != 0)
+	{
+		uint8_t *s = (uint8_t *)src;
+		if (s[0] & 1)
+		{
 			if ((err = gpio_set_level(LED_PIN, 1)))
 			{
 				ESP_LOGE("LED", "Failed to turn on, error code %d", err);
@@ -59,7 +63,9 @@ void led_set_state(uint16_t size, void *src)
 				return;
 			}
 			ESP_LOGI("LED", "Turned on");
-		} else {
+		}
+		else
+		{
 			if ((err = gpio_set_level(LED_PIN, 0)))
 			{
 				ESP_LOGE("LED", "Failed to turn off, error code %d", err);
@@ -74,16 +80,17 @@ void led_set_state(uint16_t size, void *src)
 void led_get_state(uint16_t *len, void *dst)
 {
 	uint8_t state = gpio_get_level(LED_PIN);
+	*len = sizeof(state);
 	memcpy(dst, &state, *len);
 	ESP_LOGI("LED", "Read state as %s", state ? "on" : "off");
 }
 
 bool led_has_error()
 {
-	return led_error;
+	return led_data.led_error;
 }
 
 const char *led_get_error()
 {
-	return led_error_msg;
+	return led_data.led_error_msg;
 }
