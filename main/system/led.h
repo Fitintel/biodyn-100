@@ -7,5 +7,7 @@ esp_err_t biodyn_led_init();
 
 void led_set_state(uint16_t size, void *src);
 void led_get_state(uint16_t *len, void *dst);
+bool led_has_error();
+const char *led_get_error();
 
 #endif // BIODYN_LED_H

@@ -36,21 +36,28 @@ void app_main(void)
 	if ((err = biodyn_nvs_init()))
 	{
 		ESP_LOGE(MAIN_TAG, "Failed to initialize non-volatile storage in %s, error code %x", __func__, err);
-		return;
+		return; // Fatal
+	}
+
+	// Initialize self-testing
+	if ((err = biodyn_self_test_init()))
+	{
+		ESP_LOGE(MAIN_TAG, "Failed to initialize self-test module, error code %x", err);
+		return; // Fatal
 	}
 
 	// Initialize LED
 	if ((err = biodyn_led_init()))
 	{
+		// Non-fatal
 		ESP_LOGE(MAIN_TAG, "Failed to initialize LED module, err = %d", err);
-		return;
 	}
 
 	// Initialize IMU
 	if ((err = biodyn_imu_icm20948_init()))
 	{
+		// Non-fatal
 		ESP_LOGE(MAIN_TAG, "Failed to initialize IMU module, err = %d", err);
-		return;
 	}
 
 	// Initialize bluetooth

@@ -8,33 +8,64 @@
 
 #define LED_PIN GPIO_NUM_7
 
+bool led_error = false;
+const char *led_error_msg = "Ok";
+
+void set_led_error(const char *msg)
+{
+	led_error = true;
+	led_error_msg = msg;
+}
+void clear_led_error()
+{
+	led_error = false;
+	led_error_msg = "Ok";
+}
+void set_and_log_led_error(const char *msg)
+{
+	set_led_error(msg);
+	ESP_LOGE("LED", "Error: %s", led_error_msg);
+}
+
 esp_err_t biodyn_led_init()
 {
 	esp_err_t err = 0;
 	if ((err = gpio_reset_pin(LED_PIN)))
 	{
-		ESP_LOGE("LED", "Failed to reset pin");
+		set_and_log_led_error("Failed to reset pin");
 		return err;
 	}
 	if ((err = gpio_set_direction(LED_PIN, GPIO_MODE_OUTPUT)))
 	{
-		ESP_LOGE("LED", "Failed to set direction.");
+		set_and_log_led_error("Failed to set direction");
 		return err;
 	}
 
 	ESP_LOGI("LED", "Initialized LED");
+	clear_led_error();
 	return 0;
 }
 
 void led_set_state(uint16_t size, void *src)
 {
+	esp_err_t err = 0;
 	if (size != 0) {
 		uint8_t *s = (uint8_t *) src;
 		if (s[0] & 1) {
-			gpio_set_level(LED_PIN, 1);
+			if ((err = gpio_set_level(LED_PIN, 1)))
+			{
+				ESP_LOGE("LED", "Failed to turn on, error code %d", err);
+				set_led_error("Failed to turn on");
+				return;
+			}
 			ESP_LOGI("LED", "Turned on");
 		} else {
-			gpio_set_level(LED_PIN, 0);
+			if ((err = gpio_set_level(LED_PIN, 0)))
+			{
+				ESP_LOGE("LED", "Failed to turn off, error code %d", err);
+				set_led_error("Failed to turn off");
+				return;
+			}
 			ESP_LOGI("LED", "Turned off");
 		}
 	}
@@ -47,3 +78,12 @@ void led_get_state(uint16_t *len, void *dst)
 	ESP_LOGI("LED", "Read state as %s", state ? "on" : "off");
 }
 
+bool led_has_error()
+{
+	return led_error;
+}
+
+const char *led_get_error()
+{
+	return led_error_msg;
+}

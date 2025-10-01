@@ -5,7 +5,7 @@
 #include "bluetooth/ble.h"
 #include "bluetooth/device_information_service.h"
 #include "bluetooth/test_service.h"
-
+#include "bluetooth/self_test_service.h"
 
 // ALL THE PROFILES
 static struct biodyn_ble_profile profiles[] = {
@@ -15,10 +15,15 @@ static struct biodyn_ble_profile profiles[] = {
 		.services = &device_services[0],
 	},
 	{
-		.name = "Sensor Profile",
-		.n_services = LEN_OF_STATIC_ARRAY(sensor_services),
-		.services = &sensor_services[0],
+		.name = "Test Profile",
+		.n_services = LEN_OF_STATIC_ARRAY(test_services),
+		.services = &test_services[0],
 	},
+	{
+		.name = "Self-Test Profile",
+		.n_services = LEN_OF_STATIC_ARRAY(self_test_services),
+		.services = &self_test_services[0],
+	}
 };
 
 #endif // BIODYN_BLE_PROFILES_H

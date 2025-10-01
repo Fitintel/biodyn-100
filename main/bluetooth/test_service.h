@@ -34,7 +34,7 @@ static struct biodyn_ble_characteristic sensor_test_chars[] = {
 		.get_data = imu_icm20948_get_state,
 	}};
 
-static struct biodyn_ble_service sensor_services[] = {
+static struct biodyn_ble_service test_services[] = {
 	{
 		.name = "Test Sensor Service",
 		.service_id = {
