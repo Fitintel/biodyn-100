@@ -2,9 +2,9 @@
 #define BIODYN_BLE_PROFILES_H
 
 #include "constants.h"
-#include "ble.h"
-#include "led.h"
-#include "imu_icm20948_driver.h"
+#include "bluetooth/ble.h"
+#include "system/led.h"
+#include "accel/imu_icm20948_driver.h"
 
 static struct biodyn_ble_characteristic device_info_chars[] = {
 	{

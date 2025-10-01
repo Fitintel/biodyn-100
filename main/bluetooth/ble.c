@@ -21,7 +21,7 @@
 #include "esp_timer.h"
 #include "sdkconfig.h"
 
-#include "ble.h"
+#include "bluetooth/ble.h"
 #include "constants.h"
 
 /* ----------------------------

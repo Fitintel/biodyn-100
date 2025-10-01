@@ -3,6 +3,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
+#include <string.h>
 
 
 #define LED_PIN GPIO_NUM_7

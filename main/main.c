@@ -15,11 +15,10 @@
 #include "sdkconfig.h"
 
 #include "constants.h"
-#include "nvs.h"
-#include "ble.h"
-#include "ble_profiles.h"
-
-#include "imu_icm20948_driver.h"
+#include "system/nvs.h"
+#include "bluetooth/ble.h"
+#include "bluetooth/ble_profiles.h"
+#include "accel/imu_icm20948_driver.h"
 
 void test_accel_imu_icm20948();
 void test_all_registers_imu_icm20948();
