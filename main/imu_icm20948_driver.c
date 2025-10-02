@@ -486,7 +486,8 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
 {
 	// Set slave0 to be the built in magnetometer
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, AK09916_ADDRESS);
+	// Or first bit with 0 in order to indicate write
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x00 | AK09916_ADDRESS);
 	// Set the register to write to
 	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
 	// Set the data to write
@@ -504,7 +505,8 @@ static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
 static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len)
 {
 	// Set slave0 to be the built in magnetometer
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, AK09916_ADDRESS);
+	// Or first bit with 1 in order to indicate read
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x80 | AK09916_ADDRESS);
 	// Set the register to read from
 	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
 
