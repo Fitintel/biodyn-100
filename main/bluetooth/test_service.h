@@ -17,7 +17,7 @@ void imu_icm20948_get_state(uint16_t *len, void *dst)
 	// copying from address of imu data for its length (len)
 }
 
-static struct biodyn_ble_characteristic sensor_test_chars[] = {
+const static struct biodyn_ble_characteristic sensor_test_chars[] = {
 	{
 		.name = "LED Control",
 		.uuid = BIODYN_BLE_UUID_16(0x1235),
@@ -32,43 +32,42 @@ static struct biodyn_ble_characteristic sensor_test_chars[] = {
 		.permissions = BIODYN_PERM_READ,
 		.properties = BIODYN_PROP_READ,
 		.get_data = imu_icm20948_get_state,
-	}};
+	}
+};
 
-static struct biodyn_ble_service test_services[] = {
-	{
-		.name = "Test Sensor Service",
-		.service_id = {
-			.is_primary = true,
-			.id = {
-				.inst_id = 0,
+const static struct biodyn_ble_service test_service = {
+	.name = "Test Sensor Service",
+	.service_id = {
+		.is_primary = true,
+		.id = {
+			.inst_id = 0,
+			.uuid = {
 				.uuid = {
-					.uuid = {
-						.uuid128 = {
-							0xFB,
-							0x34,
-							0x9B,
-							0x5F,
-							0x80,
-							0x00,
-							0x00,
-							0x80,
-							0x00,
-							0x10,
-							0x00,
-							0x00,
-							0xFF,
-							0xFF,
-							0x00,
-							0x00,
-						},
+					.uuid128 = {
+						0xFB,
+						0x34,
+						0x9B,
+						0x5F,
+						0x80,
+						0x00,
+						0x00,
+						0x80,
+						0x00,
+						0x10,
+						0x00,
+						0x00,
+						0xFF,
+						0xFF,
+						0x00,
+						0x00,
 					},
-					.len = ESP_UUID_LEN_128,
 				},
+				.len = ESP_UUID_LEN_128,
 			},
 		},
-		.n_characteristics = LEN_OF_STATIC_ARRAY(sensor_test_chars),
-		.characteristics = &sensor_test_chars[0],
 	},
+	.n_characteristics = LEN_OF_STATIC_ARRAY(sensor_test_chars),
+	.characteristics = &sensor_test_chars[0],
 };
 
 #endif // BIODYN_TEST_BLE_SERVICE

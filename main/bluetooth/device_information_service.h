@@ -4,7 +4,7 @@
 #include "constants.h"
 #include "bluetooth/ble.h"
 
-static struct biodyn_ble_characteristic device_info_chars[] = {
+const static struct biodyn_ble_characteristic device_info_chars[] = {
 	{
 		.name = "Manufacturer Name String",
 		.uuid = BIODYN_BLE_UUID_16(0x2A29),
@@ -52,15 +52,13 @@ static struct biodyn_ble_characteristic device_info_chars[] = {
 		.properties = BIODYN_PROP_READ,
 		.initial_value = (void *)BIODYN_SYSTEM_ID,
 		.intial_value_size = sizeof(BIODYN_SYSTEM_ID),
-	}
-};
-static struct biodyn_ble_service device_services[] = {
-	{
-		.name = "Device Information Service",
-		.service_id = BIODYN_BLE_SERVICE_ID_16(0x180A),
-		.n_characteristics = LEN_OF_STATIC_ARRAY(device_info_chars),
-		.characteristics = &device_info_chars[0],
-	},
+	}};
+
+const static struct biodyn_ble_service device_information_service = {
+	.name = "Device Information Service",
+	.service_id = BIODYN_BLE_SERVICE_ID_16(0x180A),
+	.n_characteristics = LEN_OF_STATIC_ARRAY(device_info_chars),
+	.characteristics = &device_info_chars[0],
 };
 
 #endif // BIODYN_DEVICE_INFORMATION_SERVICE_H

@@ -50,7 +50,7 @@ void app_main(void)
 	// Initialize subsystems
 	for (int i = 0; i < n_biodyn_systems; ++i)
 	{
-		biodyn_system *system = &biodyn_systems[i];
+		const biodyn_system *system = &biodyn_systems[i];
 		if ((err = system->init()) != ESP_OK)
 			ESP_LOGE(MAIN_TAG, "Subsystem %s failed during initialization: err code %x", system->name, err);
 		if (system->has_error())

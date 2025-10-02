@@ -40,7 +40,7 @@ struct biodyn_ble_profile
 {
 	const char *name;					 // The name of this profile
 	uint16_t n_services;				 // The number of services for this profile
-	struct biodyn_ble_service *services; // The list of services for this profile
+	const struct biodyn_ble_service *services; // The list of services for this profile
 
 	// TODO: Add callback when profile is completely set up
 };
@@ -51,7 +51,7 @@ struct biodyn_ble_service
 	const char *name;								   // The name of this service
 	esp_gatt_srvc_id_t service_id;					   // The GATTS service ID
 	uint16_t n_characteristics;						   // The number of characteristics this service has
-	struct biodyn_ble_characteristic *characteristics; // The list of characteristics
+	const struct biodyn_ble_characteristic *characteristics; // The list of characteristics
 	bool advertise;									   // Whether to put this service in advertisment packets or not
 
 	// TODO: Add callback when service is completely set up

@@ -27,7 +27,9 @@
 		"math.h": "c",
 		"sdkconfig.h": "c",
 		"device_information_service.h": "c",
-		"self_test.h": "c"
+		"self_test.h": "c",
+		"test_service.h": "c",
+		"time_sync_service.h": "c"
 	},
 	"idf.flashType": "JTAG"
 }
