@@ -491,16 +491,29 @@ static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
 	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
 	// Set the data to write
 	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_DO, data);
-	// Start the write on the slave
 
-	// TODO: figure out how to send the write via I2C_SLV0_CTRL (probably)
-
-	// Might need a delay here to finish I2C transaction: TODO
+	// Enable and single data write
+	// TODO: what does this mean?
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80);
+	// Delay to allow I2C transaction
+	vTaskDelay(pdMS_TO_TICKS(50));
+	// TODO: check if delay is necessary
 }
 
 // Reads into the magnetometer attached to the ICM20948
-static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t data)
+static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len)
 {
+	// Set slave0 to be the built in magnetometer
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, AK09916_ADDRESS);
+	// Set the register to read from
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
+
+	// Enable and single data write
+	// TODO: see biodyn_imu_ak09916_write_reg function
+	// Bits [3:0] in I2C_SLV0_CTRL are the len to read (if capped)
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | len);
+	// Delay to allow I2C transaction
+	vtaskdelay(pdMS_TO_TICKS(50));
 }
 
 // Reads and returns compass data
