@@ -48,6 +48,8 @@ esp_err_t biodyn_led_init()
 	return 0;
 }
 
+
+// Bluetooth call
 void led_set_state(uint16_t size, void *src)
 {
 	esp_err_t err = 0;

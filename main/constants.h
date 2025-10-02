@@ -18,4 +18,13 @@
 // Utility defines
 #define LEN_OF_STATIC_ARRAY(static_array) (sizeof(static_array) / sizeof(static_array[0]))
 
+// Generic systems
+typedef struct biodyn_system
+{
+	const char *name;
+	esp_err_t (*init)();
+	bool (*has_error)();
+	const char* (*get_error)();
+} biodyn_system;
+
 #endif // BIODYN_CONSTANTS_H

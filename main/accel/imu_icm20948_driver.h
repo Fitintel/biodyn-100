@@ -4,6 +4,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
+#include "constants.h"
 
 #define IMU_ACCEL_UNIT "m/s^2"
 #define IMU_GYRO_UNIT "dps"
@@ -65,7 +66,7 @@ struct i2c_config
 typedef struct i2c_config i2c_config_t;
 
 // BIODYN IMU driver error code type: BIODYN_IMU_ERR_
-typedef uint16_t biodyn_imu_err_t;
+typedef esp_err_t biodyn_imu_err_t;
 #define BIODYN_IMU_OK 0
 #define BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS 0x1
 #define BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV 0x2
@@ -94,5 +95,11 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out);
 // biodyn_imu_err_t biodyn_imu_icm20948_read_user_ctrl();
 
 biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out);
+
+const static biodyn_system biodyn_imu_system = {
+	.name = "IMU",
+	.init = biodyn_imu_icm20948_init,
+	// TODO: Add error stuff
+};
 
 #endif // ICM20948_DRIVER_H
