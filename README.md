@@ -1,4 +1,4 @@
-# BIODYN-100 Firmware
+# BIOmetrics and DYnamics Node 100 Firmware
 
 This repo holds firmware for the BIODYN-100.
 
