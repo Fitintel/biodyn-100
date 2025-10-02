@@ -53,6 +53,21 @@
 #define I2C_SLV0_DO 0X06
 
 #define AK09916_ADDRESS 0x0c
+#define AK09916_WIA 0x01
+#define AK09916_STATUS1 0x10
+#define AK09916_HXL 0x11
+#define AK09916_HXH 0x12
+#define AK09916_HYL 0x13
+#define AK09916_HYH 0x14
+#define AK09916_HZL 0x15
+#define AK09916_HZH 0x16
+#define AK09916_STATUS1 0x18
+#define AK09916_CONTROL2 0x31
+#define AK09916_CONTROL3 0x32
+// #define AK09916_TEST1 0X33
+// #define AK09916_TEST2 0x34
+// Do not use these two registers above
+
 #define TAG "IMU_ICM20948"
 #define EARTH_GRAVITY 9.80665f
 

@@ -147,8 +147,18 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// ERROR: Retry turning off sleep mode of icm20948
 	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
+	// Initialize magnetometer
+	biodyn_imu_icm20948_init_magnetomter();
+
+	// Read the magnetometer data from HXL to HZH
+	// i.e., the values of the magnetometer for x,y,z seperated into 2 bytes each
+	biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
+	// 8 (not 6) byte read necessary: must sample the status and control register
+	// in order to refresh readings (take from new sample).
+
 	// Self test to ensure proper functionality
 	biodyn_imu_icm20948_self_test();
+	// TODO: write self_tests for magnetometer
 
 	// Initialize the magnetometer
 
@@ -477,9 +487,15 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_ODR_CONFIG, temp);
 
 	// Reset magnetometer
-	// Start continuous mode
-	// Both above operations require operation in the magnetometer,
-	// not just through SPI: TODO
+	biodyn_imu_ak09916_write_reg(AK09916_CONTROL3, 0x01);
+	// Delay to allow reset
+	vTaskDelay(pdMS_TO_TICKS(100));
+
+	// Start continuous mode:
+	// // Roughly sampling constantly at 100khz (Standard-mode p. 15)
+	biodyn_imu_ak09916_write_reg(AK09916_CONTROL3, 0x08);
+
+	// Magnetometer ready for use!
 }
 
 // Writes into the magnetometer attached to the ICM20948
