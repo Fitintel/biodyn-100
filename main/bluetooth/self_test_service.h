@@ -19,8 +19,7 @@ const static struct biodyn_ble_characteristic self_test_chars[] = {
 		.uuid = BIODYN_BLE_UUID_16(0x1A11),
 		.permissions = BIODYN_PERM_READ,
 		.properties = BIODYN_PROP_READ,
-		// TODO: Implement get_data for self-test message
-		// .get_data =
+		.get_data = self_test_get_err_msg,
 	}};
 
 const static struct biodyn_ble_service self_test_service = {

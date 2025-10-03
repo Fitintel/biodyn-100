@@ -99,6 +99,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t r
 const static biodyn_system biodyn_imu_system = {
 	.name = "IMU",
 	.init = biodyn_imu_icm20948_init,
+	.self_test = biodyn_imu_icm20948_self_test,
 	// TODO: Add error stuff
 };
 
