@@ -8,7 +8,8 @@
 #include "string.h"
 
 #define ACCEL_SENSITIVITY_SCALE_FACTOR (1 << (14 - ACCEL_RANGE_VALUE))
-#define GYRO_SENSITIVITY_SCALE_FACTOR 16.4 * (1 << (3 - GYRO_RANGE_VALUE));
+#define GYRO_SENSITIVITY_SCALE_FACTOR 16.4 * (1 << (3 - GYRO_RANGE_VALUE))
+#define MAG_SENSITIVITY_SCALE_FACTOR 4900 / (1 << 14)
 // IMU driver data
 static struct
 {
@@ -441,9 +442,45 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data)
 	data->accel_y = ((float)raw_ay / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
 	data->accel_z = ((float)raw_az / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
 
+	data->gyro_x = (float)raw_gx / MAG_SENSITIVITY_SCALE_FACTOR;
+	data->gyro_y = (float)raw_gy / GYRO_SENSITIVITY_SCALE_FACTOR;
+	data->gyro_z = (float)raw_gz / GYRO_SENSITIVITY_SCALE_FACTOR;
+
+	ESP_LOGI(TAG, "accel factor should be 16384 was %d", ACCEL_SENSITIVITY_SCALE_FACTOR);
+	free(out);
+	return BIODYN_IMU_OK;
+}
+
+biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
+{
+	uint8_t out_length = 18;
+	uint8_t *out = malloc(sizeof(uint8_t) * out_length);
+
+	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
+
+	// Byte shifting for full high and low register with proper endianness
+	int16_t raw_ax = (int16_t)((out[0] << 8) | out[1]);
+	int16_t raw_ay = (int16_t)((out[2] << 8) | out[3]);
+	int16_t raw_az = (int16_t)((out[4] << 8) | out[5]);
+	int16_t raw_gx = (int16_t)((out[6] << 8) | out[7]);
+	int16_t raw_gy = (int16_t)((out[8] << 8) | out[9]);
+	int16_t raw_gz = (int16_t)((out[10] << 8) | out[11]);
+	// gap of two bytes between accel + gyro and mag for temperature registers
+	int16_t raw_mx = (int16_t)((out[15] << 8) | out[14]);
+	int16_t raw_my = (int16_t)((out[17] << 8) | out[16]);
+	int16_t raw_mz = (int16_t)((out[19] << 8) | out[18]);
+
+	data->accel_x = ((float)raw_ax / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
+	data->accel_y = ((float)raw_ay / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
+	data->accel_z = ((float)raw_az / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
+
 	data->gyro_x = (float)raw_gx / GYRO_SENSITIVITY_SCALE_FACTOR;
 	data->gyro_y = (float)raw_gy / GYRO_SENSITIVITY_SCALE_FACTOR;
 	data->gyro_z = (float)raw_gz / GYRO_SENSITIVITY_SCALE_FACTOR;
+
+	data->gyro_x = (float)raw_mx * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->gyro_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->gyro_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
 
 	ESP_LOGI(TAG, "accel factor should be 16384 was %d", ACCEL_SENSITIVITY_SCALE_FACTOR);
 	free(out);
@@ -493,7 +530,7 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 
 	// Start continuous mode:
 	// // Roughly sampling constantly at 100khz (Standard-mode p. 15)
-	biodyn_imu_ak09916_write_reg(AK09916_CONTROL3, 0x08);
+	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, 0x08);
 
 	// Magnetometer ready for use!
 }
@@ -511,7 +548,7 @@ static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
 
 	// Enable and single data write
 	// TODO: what does this mean?
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80);
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | 0x01);
 	// Delay to allow I2C transaction
 	vTaskDelay(pdMS_TO_TICKS(50));
 	// TODO: check if delay is necessary
@@ -540,6 +577,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_magnetometer(imu_float3_t *out)
 	// TODO: implement!
 	// https://www.youtube.com/watch?v=lGjwZ5NmLsU
 
-	// I2C between accel|gyro and magnetometer
+	// deprecated: See biodyn_imu_icm20948_read_accel_gyro_mag
+
 	return BIODYN_IMU_OK;
 }

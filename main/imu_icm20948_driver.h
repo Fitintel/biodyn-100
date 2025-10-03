@@ -16,9 +16,9 @@ typedef struct
 	float gyro_x;
 	float gyro_y;
 	float gyro_z;
-	// int16_t mag_x;
-	// int16_t mag_y;
-	// int16_t mag_z;
+	float mag_x;
+	float mag_y;
+	float mag_z;
 } imu_motion_data;
 
 typedef enum

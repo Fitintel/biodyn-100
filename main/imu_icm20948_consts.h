@@ -32,6 +32,24 @@
 #define GYRO_CONFIG_1 0x01
 #define GYRO_CONFIG_2 0x02
 
+#define TEMP_OUT_H 0x39
+#define TEMP_OUT_L 0x3a
+
+// The equivalent of (x...z)out(h...l) for magnetometer
+#define EXT_SLV_SENS_DATA_00 0x3b
+#define EXT_SLV_SENS_DATA_01 0x3c
+#define EXT_SLV_SENS_DATA_02 0x3d
+#define EXT_SLV_SENS_DATA_03 0x3e
+#define EXT_SLV_SENS_DATA_04 0x3f
+#define EXT_SLV_SENS_DATA_05 0x40
+
+#define MAG_XOUT_H EXT_SLV_SENS_DATA_00
+#define MAG_XOUT_L EXT_SLV_SENS_DATA_01
+#define MAG_YOUT_H EXT_SLV_SENS_DATA_02
+#define MAG_YOUT_L EXT_SLV_SENS_DATA_03
+#define MAG_ZOUT_H EXT_SLV_SENS_DATA_04
+#define MAG_ZOUT_L EXT_SLV_SENS_DATA_05
+
 // Register bank 1
 #define SELF_TEST_X_GYRO 0x2
 #define SELF_TEST_Y_GYRO 0x3
