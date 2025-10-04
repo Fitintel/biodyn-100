@@ -423,34 +423,6 @@ biodyn_imu_err_t self_test_accel(int16_t *out)
 	return BIODYN_IMU_OK;
 }
 
-biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data)
-{
-	uint8_t out_length = 12;
-	uint8_t *out = malloc(sizeof(uint8_t) * out_length);
-
-	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
-
-	// Byte shifting for full high and low register with proper endianness
-	int16_t raw_ax = (int16_t)((out[0] << 8) | out[1]);
-	int16_t raw_ay = (int16_t)((out[2] << 8) | out[3]);
-	int16_t raw_az = (int16_t)((out[4] << 8) | out[5]);
-	int16_t raw_gx = (int16_t)((out[6] << 8) | out[7]);
-	int16_t raw_gy = (int16_t)((out[8] << 8) | out[9]);
-	int16_t raw_gz = (int16_t)((out[10] << 8) | out[11]);
-
-	data->accel_x = ((float)raw_ax / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
-	data->accel_y = ((float)raw_ay / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
-	data->accel_z = ((float)raw_az / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
-
-	data->gyro_x = (float)raw_gx / MAG_SENSITIVITY_SCALE_FACTOR;
-	data->gyro_y = (float)raw_gy / GYRO_SENSITIVITY_SCALE_FACTOR;
-	data->gyro_z = (float)raw_gz / GYRO_SENSITIVITY_SCALE_FACTOR;
-
-	ESP_LOGI(TAG, "accel factor should be 16384 was %d", ACCEL_SENSITIVITY_SCALE_FACTOR);
-	free(out);
-	return BIODYN_IMU_OK;
-}
-
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 {
 	uint8_t out_length = 18;
@@ -569,15 +541,4 @@ static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len)
 	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | len);
 	// Delay to allow I2C transaction
 	vtaskdelay(pdMS_TO_TICKS(50));
-}
-
-// Reads and returns compass data
-biodyn_imu_err_t biodyn_imu_icm20948_read_magnetometer(imu_float3_t *out)
-{
-	// TODO: implement!
-	// https://www.youtube.com/watch?v=lGjwZ5NmLsU
-
-	// deprecated: See biodyn_imu_icm20948_read_accel_gyro_mag
-
-	return BIODYN_IMU_OK;
 }
