@@ -40,7 +40,7 @@ struct biodyn_ble_profile
 {
 	const char *name;					 // The name of this profile
 	uint16_t n_services;				 // The number of services for this profile
-	struct biodyn_ble_service *services; // The list of services for this profile
+	const struct biodyn_ble_service *services; // The list of services for this profile
 
 	// TODO: Add callback when profile is completely set up
 };
@@ -51,7 +51,7 @@ struct biodyn_ble_service
 	const char *name;								   // The name of this service
 	esp_gatt_srvc_id_t service_id;					   // The GATTS service ID
 	uint16_t n_characteristics;						   // The number of characteristics this service has
-	struct biodyn_ble_characteristic *characteristics; // The list of characteristics
+	const struct biodyn_ble_characteristic *characteristics; // The list of characteristics
 	bool advertise;									   // Whether to put this service in advertisment packets or not
 
 	// TODO: Add callback when service is completely set up
@@ -110,5 +110,12 @@ struct biodyn_ble_char_descriptor
 	}
 
 #define BIODYN_BLE_SERVICE_ID_16(uuid_value) {.id = {BIODYN_BLE_UUID_16(uuid_value), .inst_id = 0}, .is_primary = true}
+
+#define BIODYN_PERM_READ ESP_GATT_PERM_READ
+#define BIODYN_PERM_WRITE ESP_GATT_PERM_WRITE
+#define BIODYN_PERM_READ_WRITE BIODYN_PERM_READ | BIODYN_PERM_WRITE 
+#define BIODYN_PROP_READ ESP_GATT_CHAR_PROP_BIT_READ
+#define BIODYN_PROP_WRITE ESP_GATT_CHAR_PROP_BIT_WRITE
+#define BIODYN_PROP_READ_WRITE BIODYN_PROP_READ | BIODYN_PROP_WRITE
 
 #endif // FITNET_BLE_H

@@ -15,11 +15,10 @@
 #include "sdkconfig.h"
 
 #include "constants.h"
-#include "nvs.h"
-#include "ble.h"
-#include "ble_profiles.h"
-
-#include "imu_icm20948_driver.h"
+#include "system/nvs.h"
+#include "bluetooth/ble.h"
+#include "bluetooth/ble_profiles.h"
+#include "biodyn_systems.h"
 
 void test_accel_imu_icm20948();
 void test_all_registers_imu_icm20948();
@@ -35,29 +34,32 @@ void app_main(void)
 	// Initialize persistant storage (nvs)
 	if ((err = biodyn_nvs_init()))
 	{
-		ESP_LOGE(MAIN_TAG, "Failed to initialize non-volatile storage in %s, error code %x", __func__, err);
-		return;
+		ESP_LOGE(MAIN_TAG, "FATAL: Failed to initialize non-volatile storage in %s, error code %x", __func__, err);
+		return; // Fatal
 	}
 
-	// Initialize LED
-	if ((err = biodyn_led_init()))
+	// Initialize self-testing
+	if ((err = biodyn_self_test_init()))
 	{
-		ESP_LOGE(MAIN_TAG, "Failed to initialize LED module, err = %d", err);
-		return;
+		ESP_LOGE(MAIN_TAG, "FATAL: Failed to initialize self-test module, error code %x", err);
+		return; // Fatal
 	}
 
-	// Initialize IMU
-	if ((err = biodyn_imu_icm20948_init()))
+	// Initialize subsystems
+	for (int i = 0; i < n_biodyn_systems; ++i)
 	{
-		ESP_LOGE(MAIN_TAG, "Failed to initialize IMU module, err = %d", err);
-		return;
+		const biodyn_system *system = &biodyn_systems[i];
+		if ((err = system->init()) != ESP_OK)
+			ESP_LOGE(MAIN_TAG, "Subsystem %s failed during initialization: err code %x", system->name, err);
+		if (system->has_error())
+			ESP_LOGE(MAIN_TAG, "Failed to initialize subsystem %s: \"%s\"", system->name, system->get_error());
 	}
 
 	// Initialize bluetooth
 	if ((err = biodyn_ble_init(LEN_OF_STATIC_ARRAY(profiles), &profiles[0])))
 	{
-		ESP_LOGE(MAIN_TAG, "Failed to initialize Bluetooth in %s, err code %x", __func__, err);
-		return;
+		ESP_LOGE(MAIN_TAG, "FATAL: Failed to initialize Bluetooth in %s, err code %x", __func__, err);
+		return; // Fatal
 	}
 
 	// Set up!

@@ -21,7 +21,7 @@
 #include "esp_timer.h"
 #include "sdkconfig.h"
 
-#include "ble.h"
+#include "bluetooth/ble.h"
 #include "constants.h"
 
 /* ----------------------------
@@ -761,7 +761,7 @@ void biodyn_ble_load_schematic(uint16_t n_profiles, struct biodyn_ble_profile *p
 		for (int j = 0; j < profile_schematic->n_services; ++j)
 		{
 			struct biodyn_ble_service_data *service = &profile->services[j];
-			struct biodyn_ble_service *service_schematic = &profile_schematic->services[j];
+			const struct biodyn_ble_service *service_schematic = &profile_schematic->services[j];
 			service->name = service_schematic->name;
 			service->n_characteristics = service_schematic->n_characteristics;
 			service->characteristics = malloc(sizeof(struct biodyn_ble_characteristic_data) * service->n_characteristics);
@@ -817,7 +817,7 @@ void biodyn_ble_load_schematic(uint16_t n_profiles, struct biodyn_ble_profile *p
 			for (int k = 0; k < service_schematic->n_characteristics; ++k)
 			{
 				struct biodyn_ble_characteristic_data *chr = &service->characteristics[k];
-				struct biodyn_ble_characteristic *chr_schematic = &service_schematic->characteristics[k];
+				const struct biodyn_ble_characteristic *chr_schematic = &service_schematic->characteristics[k];
 				chr->name = chr_schematic->name;
 				chr->uuid = chr_schematic->uuid;
 				chr->permissions = chr_schematic->permissions;

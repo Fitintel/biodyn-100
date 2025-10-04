@@ -1,7 +1,7 @@
 {
     "C_Cpp.intelliSenseEngine": "default",
     "idf.espIdfPath": "/Users/callum/esp/esp-idf",
-    "idf.pythonInstallPath": "C:\\Espressif\\tools\\idf-python\\3.11.2\\python.exe",
+    "idf.pythonInstallPath": "/usr/bin/python3",
     "idf.openOcdConfigs": [
         "board/esp32s3-builtin.cfg"
     ],
@@ -19,7 +19,17 @@
 		"xutility": "c",
 		"imu_icm20948_driver.h": "c",
 		"chrono": "c",
-		"typeinfo": "c"
+		"typeinfo": "c",
+		"led.h": "c",
+		"ble_profiles.h": "c",
+		"ble.h": "c",
+		"esp_gap_ble_api.h": "c",
+		"math.h": "c",
+		"sdkconfig.h": "c",
+		"device_information_service.h": "c",
+		"self_test.h": "c",
+		"test_service.h": "c",
+		"time_sync_service.h": "c"
 	},
 	"idf.flashType": "JTAG"
 }
