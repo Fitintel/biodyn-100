@@ -8,6 +8,7 @@
 
 #define IMU_ACCEL_UNIT "m/s^2"
 #define IMU_GYRO_UNIT "dps"
+#define IMU_MAG_UNIT "uT"
 
 typedef struct
 {
@@ -17,9 +18,9 @@ typedef struct
 	float gyro_x;
 	float gyro_y;
 	float gyro_z;
-	// int16_t mag_x;
-	// int16_t mag_y;
-	// int16_t mag_z;
+	float mag_x;
+	float mag_y;
+	float mag_z;
 } imu_motion_data;
 
 typedef enum
@@ -83,14 +84,17 @@ biodyn_imu_err_t biodyn_imu_icm20948_init();
 // Performs an IMU self-test
 biodyn_imu_err_t biodyn_imu_icm20948_self_test();
 
+// DEPRECATED:
 // Reads both accel and gyro data
-biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data);
+// biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data);
+
+biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data);
 
 // TEMPORARY test to work out accel gyro multibyte reading
 biodyn_imu_err_t self_test_accel(int16_t *out);
 
 // Reads and returns compass data
-biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out);
+biodyn_imu_err_t biodyn_imu_icm20948_read_magnetometer(imu_float3_t *out);
 
 // biodyn_imu_err_t biodyn_imu_icm20948_read_user_ctrl();
 

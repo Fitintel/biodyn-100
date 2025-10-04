@@ -24,8 +24,6 @@ void test_accel_imu_icm20948();
 void test_all_registers_imu_icm20948();
 void test_accel_gyro_imu_icm20948();
 
-
-
 // APP ENTRY POINT
 void app_main(void)
 {
@@ -63,13 +61,13 @@ void app_main(void)
 		ESP_LOGE(MAIN_TAG, "FATAL: Failed to initialize Bluetooth in %s, err code %x", __func__, err);
 		return; // Fatal
 	}
-  
-  	// Set up!
+
+	// Set up!
 	ESP_LOGI(MAIN_TAG, "Finished setup");
-  
-// 	test_all_registers_imu_icm20948();
-// 	test_accel_imu_icm20948();
-// 	test_accel_gyro_imu_icm20948();
+
+	// 	test_all_registers_imu_icm20948();
+	// 	test_accel_imu_icm20948();
+	// 	test_accel_gyro_imu_icm20948();
 }
 
 void test_accel_imu_icm20948()
@@ -152,7 +150,7 @@ void test_all_registers_imu_icm20948()
 	return;
 }
 
-void test_accel_gyro_imu_icm20948()
+void test_accel_gyro_mag_imu_icm20948()
 {
 	imu_motion_data data = {0};
 	for (int i = 0; i < 2000; ++i)
@@ -164,6 +162,9 @@ void test_accel_gyro_imu_icm20948()
 		ESP_LOGI(MAIN_TAG, "GYRO X: %.3f %s", data.gyro_x, IMU_GYRO_UNIT);
 		ESP_LOGI(MAIN_TAG, "GYRO Y: %.3f %s", data.gyro_y, IMU_GYRO_UNIT);
 		ESP_LOGI(MAIN_TAG, "GYRO Z: %.3f %s", data.gyro_z, IMU_GYRO_UNIT);
+		ESP_LOGI(MAIN_TAG, "MAG X: %.3f %s", data.mag_x, IMU_MAG_UNIT);
+		ESP_LOGI(MAIN_TAG, "MAG Y: %.3f %s", data.mag_y, IMU_MAG_UNIT);
+		ESP_LOGI(MAIN_TAG, "MAG Z: %.3f %s", data.mag_z, IMU_MAG_UNIT);
 		vTaskDelay(pdMS_TO_TICKS(100)); // Sleep for 100 ms (0.1 second)
 	}
 }

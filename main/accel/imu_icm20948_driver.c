@@ -8,7 +8,8 @@
 #include "string.h"
 
 #define ACCEL_SENSITIVITY_SCALE_FACTOR (1 << (14 - ACCEL_RANGE_VALUE))
-#define GYRO_SENSITIVITY_SCALE_FACTOR 16.4 * (1 << (3 - GYRO_RANGE_VALUE));
+#define GYRO_SENSITIVITY_SCALE_FACTOR 16.4 * (1 << (3 - GYRO_RANGE_VALUE))
+#define MAG_SENSITIVITY_SCALE_FACTOR 4900 / (1 << 14)
 // IMU driver data
 static struct
 {
@@ -147,8 +148,20 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// ERROR: Retry turning off sleep mode of icm20948
 	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
+	// Initialize magnetometer
+	biodyn_imu_icm20948_init_magnetomter();
+
+	// Read the magnetometer data from HXL to HZH
+	// i.e., the values of the magnetometer for x,y,z seperated into 2 bytes each
+	biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
+	// 8 (not 6) byte read necessary: must sample the status and control register
+	// in order to refresh readings (take from new sample).
+
 	// Self test to ensure proper functionality
 	biodyn_imu_icm20948_self_test();
+	// TODO: write self_tests for magnetometer
+
+	// Initialize the magnetometer
 
 	// Successful init, all clear
 	ESP_LOGI(TAG, "Initialized IMU");
@@ -410,9 +423,9 @@ biodyn_imu_err_t self_test_accel(int16_t *out)
 	return BIODYN_IMU_OK;
 }
 
-biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data)
+biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 {
-	uint8_t out_length = 12;
+	uint8_t out_length = 18;
 	uint8_t *out = malloc(sizeof(uint8_t) * out_length);
 
 	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
@@ -424,6 +437,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data)
 	int16_t raw_gx = (int16_t)((out[6] << 8) | out[7]);
 	int16_t raw_gy = (int16_t)((out[8] << 8) | out[9]);
 	int16_t raw_gz = (int16_t)((out[10] << 8) | out[11]);
+	// gap of two bytes between accel + gyro and mag for temperature registers
+	int16_t raw_mx = (int16_t)((out[15] << 8) | out[14]);
+	int16_t raw_my = (int16_t)((out[17] << 8) | out[16]);
+	int16_t raw_mz = (int16_t)((out[19] << 8) | out[18]);
 
 	data->accel_x = ((float)raw_ax / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
 	data->accel_y = ((float)raw_ay / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
@@ -433,14 +450,95 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro(imu_motion_data *data)
 	data->gyro_y = (float)raw_gy / GYRO_SENSITIVITY_SCALE_FACTOR;
 	data->gyro_z = (float)raw_gz / GYRO_SENSITIVITY_SCALE_FACTOR;
 
+	data->gyro_x = (float)raw_mx * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->gyro_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->gyro_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
+
 	ESP_LOGI(TAG, "accel factor should be 16384 was %d", ACCEL_SENSITIVITY_SCALE_FACTOR);
 	free(out);
 	return BIODYN_IMU_OK;
 }
-// Reads and returns compass data
-biodyn_imu_err_t biodyn_imu_icm20948_read_compass(imu_float3_t *out)
-{
-	// TODO: implement!
 
-	return BIODYN_IMU_OK;
+static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
+{
+	uint8_t temp;
+	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &temp);
+	temp |= 0x02;
+	// Resets the I2C master module by writing 1 to the bit
+	// this bit set should auto clear after one clock cycle
+	// (internally at 20Mhz)
+	biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, temp);
+	// Wait for bit to auto clear
+	vTaskDelay(pdMS_TO_TICKS(100));
+
+	// Enable I2C by writing 1 to bit 5 in USER_CTRL
+	// TODO: Do I need to read again here
+	// Yes, the I2C reset can change bit 4 and 5, so new read is necessary
+	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &temp);
+	temp |= 0x20;
+	// Write 1 to bit 5 in USER_CTRL
+	biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, temp);
+
+	// Documentation states (p. 81):
+	/*
+	 To achieve a targeted clock
+	frequency of 400 kHz, MAX, it is recommended to set I2C_MST_CLK = 7 (345.6 kHz / 46.67% duty cycle).
+	*/
+	temp = 0x07;
+	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_CTRL, temp);
+
+	// Set for a custom rate to be used for sampling the magnetometer
+	temp = 0x40;
+	biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, temp);
+	// Set data rate as 136Hz
+	// Formula: 1.1 kHz/(2^((odr_config[3:0])) )
+	temp = 0x03;
+	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_ODR_CONFIG, temp);
+
+	// Reset magnetometer
+	biodyn_imu_ak09916_write_reg(AK09916_CONTROL3, 0x01);
+	// Delay to allow reset
+	vTaskDelay(pdMS_TO_TICKS(100));
+
+	// Start continuous mode:
+	// // Roughly sampling constantly at 100khz (Standard-mode p. 15)
+	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, 0x08);
+
+	// Magnetometer ready for use!
+}
+
+// Writes into the magnetometer attached to the ICM20948
+static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
+{
+	// Set slave0 to be the built in magnetometer
+	// Or first bit with 0 in order to indicate write
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x00 | AK09916_ADDRESS);
+	// Set the register to write to
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
+	// Set the data to write
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_DO, data);
+
+	// Enable and single data write
+	// TODO: what does this mean?
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | 0x01);
+	// Delay to allow I2C transaction
+	vTaskDelay(pdMS_TO_TICKS(50));
+	// TODO: check if delay is necessary
+}
+
+// Reads into the magnetometer attached to the ICM20948
+static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len)
+{
+	// Set slave0 to be the built in magnetometer
+	// Or first bit with 1 in order to indicate read
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x80 | AK09916_ADDRESS);
+	// Set the register to read from
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
+
+	// Enable and single data write
+	// TODO: see biodyn_imu_ak09916_write_reg function
+	// Bits [3:0] in I2C_SLV0_CTRL are the len to read (if capped)
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | len);
+	// Delay to allow I2C transaction
+	vtaskdelay(pdMS_TO_TICKS(50));
 }

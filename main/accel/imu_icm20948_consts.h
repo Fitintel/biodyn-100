@@ -32,6 +32,24 @@
 #define GYRO_CONFIG_1 0x01
 #define GYRO_CONFIG_2 0x02
 
+#define TEMP_OUT_H 0x39
+#define TEMP_OUT_L 0x3a
+
+// The equivalent of (x...z)out(h...l) for magnetometer
+#define EXT_SLV_SENS_DATA_00 0x3b
+#define EXT_SLV_SENS_DATA_01 0x3c
+#define EXT_SLV_SENS_DATA_02 0x3d
+#define EXT_SLV_SENS_DATA_03 0x3e
+#define EXT_SLV_SENS_DATA_04 0x3f
+#define EXT_SLV_SENS_DATA_05 0x40
+
+#define MAG_XOUT_H EXT_SLV_SENS_DATA_00
+#define MAG_XOUT_L EXT_SLV_SENS_DATA_01
+#define MAG_YOUT_H EXT_SLV_SENS_DATA_02
+#define MAG_YOUT_L EXT_SLV_SENS_DATA_03
+#define MAG_ZOUT_H EXT_SLV_SENS_DATA_04
+#define MAG_ZOUT_L EXT_SLV_SENS_DATA_05
+
 // Register bank 1
 #define SELF_TEST_X_GYRO 0x2
 #define SELF_TEST_Y_GYRO 0x3
@@ -43,7 +61,34 @@
 #define ACCEL_RANGE_VALUE _accel_2g
 #define GYRO_RANGE_VALUE _gyro_1000dps
 
+// Register bank 3
+#define I2C_MST_ODR_CONFIG 0x00
+#define I2C_MST_CTRL 0x01
+#define I2C_MST_DELAY_CTRL 0x02
+#define I2C_SLV0_ADDR 0X03
+#define I2C_SLV0_REG 0X04
+#define I2C_SLV0_CTRL 0X05
+#define I2C_SLV0_DO 0X06
+
+#define AK09916_ADDRESS 0x0c
+#define AK09916_WIA 0x01
+#define AK09916_STATUS1 0x10
+#define AK09916_HXL 0x11
+#define AK09916_HXH 0x12
+#define AK09916_HYL 0x13
+#define AK09916_HYH 0x14
+#define AK09916_HZL 0x15
+#define AK09916_HZH 0x16
+#define AK09916_STATUS1 0x18
+#define AK09916_CONTROL2 0x31
+#define AK09916_CONTROL3 0x32
+// #define AK09916_TEST1 0X33
+// #define AK09916_TEST2 0x34
+// Do not use these two registers above
+
 #define TAG "IMU_ICM20948"
 #define EARTH_GRAVITY 9.80665f
+
+#define MAXIMUM_BUS_SPEED 400 // khz
 
 #endif // IMU_ICM20948_CONSTANTS
