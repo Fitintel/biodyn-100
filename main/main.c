@@ -155,7 +155,7 @@ void test_accel_gyro_mag_imu_icm20948()
 	imu_motion_data data = {0};
 	for (int i = 0; i < 2000; ++i)
 	{
-		biodyn_imu_icm20948_read_accel_gyro(&data);
+		biodyn_imu_icm20948_read_accel_gyro_mag(&data);
 		ESP_LOGI(MAIN_TAG, "ACCEL X: %.3f %s", data.accel_x, IMU_ACCEL_UNIT);
 		ESP_LOGI(MAIN_TAG, "ACCEL Y: %.3f %s", data.accel_y, IMU_ACCEL_UNIT);
 		ESP_LOGI(MAIN_TAG, "ACCEL Z: %.3f %s", data.accel_z, IMU_ACCEL_UNIT);

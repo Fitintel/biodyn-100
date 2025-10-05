@@ -6,6 +6,8 @@
 #include "driver/gpio.h"
 #include "math.h"
 #include "string.h"
+#include "esp_mac.h"
+#include "esp_system.h"
 
 #define ACCEL_SENSITIVITY_SCALE_FACTOR (1 << (14 - ACCEL_RANGE_VALUE))
 #define GYRO_SENSITIVITY_SCALE_FACTOR 16.4 * (1 << (3 - GYRO_RANGE_VALUE))
@@ -33,6 +35,12 @@ static biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out);
 static biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data);
 // Reads data of a single register specified by a bank and address of the IMU
 static biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_address, uint8_t *out);
+// Initializes magnetometer (AK09916)
+static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter();
+// Write a byte to the magnetometer attached to the IMU
+static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data);
+// Read multiple bytes from the magnetometer attached to the IMU
+static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len);
 
 // TEST
 biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out)
@@ -153,7 +161,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 
 	// Read the magnetometer data from HXL to HZH
 	// i.e., the values of the magnetometer for x,y,z seperated into 2 bytes each
-	biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
+	err = biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
+	if (err != ESP_OK)
+	{
+		ESP_LOGE(TAG, "Failed to initialize AK09916 (magnetometer) device, error %d", err);
+		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
+	}
 	// 8 (not 6) byte read necessary: must sample the status and control register
 	// in order to refresh readings (take from new sample).
 
@@ -459,6 +472,45 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	return BIODYN_IMU_OK;
 }
 
+// Writes into the magnetometer attached to the ICM20948
+static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
+{
+	// Set slave0 to be the built in magnetometer
+	// Or first bit with 0 in order to indicate write
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x00 | AK09916_ADDRESS);
+	// Set the register to write to
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
+	// Set the data to write
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_DO, data);
+
+	// Enable and single data write
+	// TODO: what does this mean?
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | 0x01);
+	// Delay to allow I2C transaction
+	vTaskDelay(pdMS_TO_TICKS(50));
+	// TODO: check if delay is necessary
+	return BIODYN_IMU_OK;
+}
+
+// Reads into the magnetometer attached to the ICM20948
+static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len)
+{
+	// Set slave0 to be the built in magnetometer
+	// Or first bit with 1 in order to indicate read
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x80 | AK09916_ADDRESS);
+	// Set the register to read from
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
+
+	// Enable and single data write
+	// TODO: see biodyn_imu_ak09916_write_reg function
+	// Bits [3:0] in I2C_SLV0_CTRL are the len to read (if capped)
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | len);
+	// Delay to allow I2C transaction
+	vTaskDelay(pdMS_TO_TICKS(50));
+
+	return BIODYN_IMU_OK;
+}
+
 static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 {
 	uint8_t temp;
@@ -505,40 +557,5 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, 0x08);
 
 	// Magnetometer ready for use!
-}
-
-// Writes into the magnetometer attached to the ICM20948
-static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
-{
-	// Set slave0 to be the built in magnetometer
-	// Or first bit with 0 in order to indicate write
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x00 | AK09916_ADDRESS);
-	// Set the register to write to
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
-	// Set the data to write
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_DO, data);
-
-	// Enable and single data write
-	// TODO: what does this mean?
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | 0x01);
-	// Delay to allow I2C transaction
-	vTaskDelay(pdMS_TO_TICKS(50));
-	// TODO: check if delay is necessary
-}
-
-// Reads into the magnetometer attached to the ICM20948
-static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len)
-{
-	// Set slave0 to be the built in magnetometer
-	// Or first bit with 1 in order to indicate read
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x80 | AK09916_ADDRESS);
-	// Set the register to read from
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
-
-	// Enable and single data write
-	// TODO: see biodyn_imu_ak09916_write_reg function
-	// Bits [3:0] in I2C_SLV0_CTRL are the len to read (if capped)
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | len);
-	// Delay to allow I2C transaction
-	vtaskdelay(pdMS_TO_TICKS(50));
+	return BIODYN_IMU_OK;
 }

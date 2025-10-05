@@ -4,13 +4,13 @@
 #include "constants.h"
 #include "bluetooth/ble.h"
 #include "system/led.h"
-#include "accel/imu_icm20948_driver.h"
+#include "imu/imu_icm20948_driver.h"
 #include "string.h"
 
 void imu_icm20948_get_state(uint16_t *len, void *dst)
 {
 	imu_motion_data data = {0};
-	biodyn_imu_icm20948_read_accel_gyro(&data);
+	biodyn_imu_icm20948_read_accel_gyro_mag(&data);
 	*len = sizeof(imu_motion_data);
 	// Since imu_motion_data is a struct solely of floats, it can (allegedly) be directly copied for output
 	memcpy(dst, &data, *len);
@@ -32,8 +32,7 @@ const static struct biodyn_ble_characteristic sensor_test_chars[] = {
 		.permissions = BIODYN_PERM_READ,
 		.properties = BIODYN_PROP_READ,
 		.get_data = imu_icm20948_get_state,
-	}
-};
+	}};
 
 const static struct biodyn_ble_service test_service = {
 	.name = "Test Sensor Service",
