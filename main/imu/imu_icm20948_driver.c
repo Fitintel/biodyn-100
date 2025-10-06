@@ -403,11 +403,25 @@ static biodyn_imu_err_t self_test_mag()
 	biodyn_imu_err_t err;
 
 	// Start self-test on ak09916
+	// Read CNTL_2 to adjust for self-test
 	biodyn_imu_ak09916_read_reg(AK09916_CONTROL2, 1);
 
 	// Read output from external slave sensor data on icm20948
-	uint8_t *temp;
-	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, temp);
+	uint8_t temp;
+	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &temp);
+
+	// Or with self-test mode
+	temp |= 0b10000;
+	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, temp);
+
+	// Now in self-test mode, check response
+	// Check by checking DRDY (data ready) from status1
+
+	biodyn_imu_ak09916_read_reg(AK09916_STATUS1, 1);
+	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &temp);
+	if (temp & 0b00000001)
+		return BIODYN_IMU_OK;
+	return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 }
 biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 {
