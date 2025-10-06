@@ -398,6 +398,17 @@ static biodyn_imu_err_t self_test_gyro()
 
 	return BIODYN_IMU_OK;
 }
+static biodyn_imu_err_t self_test_mag()
+{
+	biodyn_imu_err_t err;
+
+	// Start self-test on ak09916
+	biodyn_imu_ak09916_read_reg(AK09916_CONTROL2, 1);
+
+	// Read output from external slave sensor data on icm20948
+	uint8_t *temp;
+	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, temp);
+}
 biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 {
 	ESP_LOGI(TAG, "Running self test");
