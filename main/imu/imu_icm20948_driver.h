@@ -68,6 +68,7 @@ typedef struct i2c_config i2c_config_t;
 
 // BIODYN IMU driver error code type: BIODYN_IMU_ERR_
 typedef esp_err_t biodyn_imu_err_t;
+// NOTICE: new errors added here must also be updated in biodyn_imu_icm20948_has_error() function.
 #define BIODYN_IMU_OK 0
 #define BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS 0x1
 #define BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV 0x2
@@ -75,7 +76,6 @@ typedef esp_err_t biodyn_imu_err_t;
 #define BIODYN_IMU_ERR_WRONG_WHOAMI 0x8
 #define BIODYN_IMU_ERR_COULDNT_CONFIGURE 0x10
 #define BIODYN_IMU_ERR_COULDNT_READ 0x20
-
 #define BIODYN_IMU_ERR_INVALID_ARGUMENT 0x5
 
 // Initializes the IMU
@@ -100,10 +100,13 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_magnetometer(imu_float3_t *out);
 
 biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out);
 
+bool biodyn_imu_icm20948_has_error();
+
 const static biodyn_system biodyn_imu_system = {
 	.name = "IMU",
 	.init = biodyn_imu_icm20948_init,
 	.self_test = biodyn_imu_icm20948_self_test,
+	.has_error = biodyn_imu_icm20948_has_error,
 	// TODO: Add error stuff
 };
 

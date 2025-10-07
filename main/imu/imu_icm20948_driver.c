@@ -27,6 +27,17 @@ static struct
 	NULL,
 };
 
+// IMU error list
+// Collects up to 3 errors before overwriting
+// 3 is arbitrarilty and can be further worked upon: TODO
+char *biodyn_imu_icm20948_errors[3] = {0};
+
+// Dictates whether an error exists in the IMU
+bool biodyn_imu_icm20948_has_error = false;
+// An index to add errors to the IMU's error logs
+uint8_t biodyn_imu_icm20948_error_index = 0;
+// TODO: integerate error management into driver
+
 // Sets the user bank of registers
 static biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank);
 // Reads the user bank of registers
@@ -41,6 +52,60 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter();
 static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data);
 // Read multiple bytes from the magnetometer attached to the IMU
 static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len);
+static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *optional_attached_message);
+
+// Adds errors to the IMU driver's subsystem error collection. A complete list of biodyn IMU errors can be found below and in imu_icm20948_driver.h
+/**
+ * BIODYN_IMU_OK 0
+ * BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS 0x1
+ * BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV 0x2
+ * BIODYN_IMU_ERR_COULDNT_SEND_DATA 0x4
+ * BIODYN_IMU_ERR_WRONG_WHOAMI 0x8
+ * BIODYN_IMU_ERR_COULDNT_CONFIGURE 0x10
+ * BIODYN_IMU_ERR_COULDNT_READ 0x20
+ * BIODYN_IMU_ERR_INVALID_ARGUMENT 0x5
+ */
+static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *optional_attached_message)
+{
+	char *error_msg;
+	switch (error)
+	{
+	case BIODYN_IMU_OK:
+		error_msg = "BIODYN_IMU_OK\n";
+		break;
+	case BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS:
+		error_msg = "BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS\n";
+		break;
+	case BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV:
+		error_msg = "BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV\n";
+		break;
+	case BIODYN_IMU_ERR_COULDNT_SEND_DATA:
+		error_msg = "BIODYN_IMU_ERR_COULDNT_SEND_DATA\n";
+		break;
+	case BIODYN_IMU_ERR_WRONG_WHOAMI:
+		error_msg = "BIODYN_IMU_ERR_WRONG_WHOAMI\n";
+		break;
+	case BIODYN_IMU_ERR_COULDNT_CONFIGURE:
+		error_msg = "BIODYN_IMU_ERR_COULDNT_CONFIGURE\n";
+		break;
+	case BIODYN_IMU_ERR_COULDNT_READ:
+		error_msg = "BIODYN_IMU_ERR_COULDNT_READ\n";
+		break;
+	case BIODYN_IMU_ERR_INVALID_ARGUMENT:
+		error_msg = "BIODYN_IMU_ERR_INVALID_ARGUMENT\n";
+		break;
+	default:
+		error_msg = "UNRECOGNIZED ERROR OCCURED\n";
+		break;
+	}
+	if (optional_attached_message != NULL)
+	{
+		error_msg = strcat(error_msg, optional_attached_message);
+	}
+	biodyn_imu_icm20948_errors[biodyn_imu_icm20948_error_index] = error_msg;
+	biodyn_imu_icm20948_error_index = (biodyn_imu_icm20948_error_index + 1) % 3;
+	return;
+}
 
 // TEST
 biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out)
@@ -583,4 +648,8 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 
 	// Magnetometer ready for use!
 	return BIODYN_IMU_OK;
+}
+
+bool biodyn_imu_icm20948_has_error()
+{
 }
