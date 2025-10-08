@@ -95,7 +95,10 @@ static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *opti
 		error_msg = "BIODYN_IMU_ERR_INVALID_ARGUMENT\n";
 		break;
 	default:
-		error_msg = "UNRECOGNIZED ERROR OCCURED\n";
+		// Assume it is an esp error then,
+		// This esp method from esp_err.h also handles unknown errors for us
+		// Only overlap is BIODYN_IMU_OK and ESP_OK, therefore sufficient
+		error_msg = strcat(esp_err_to_name(error), "\n");
 		break;
 	}
 	if (optional_attached_message != NULL)
@@ -112,7 +115,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t r
 {
 	// Ensure valid pointer
 	if (!out)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "READ_REGISTER_TEST: invalid out pointer");
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
+	}
 
 	// Identify user bank before selecting register details
 	biodyn_imu_icm20948_set_user_bank(bank);
@@ -131,7 +137,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t r
 	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "READ_REGISTER_TEST: failed spi transaction");
 		return err;
+	}
 
 	// rx_data[1] contains read  and rx[0] is dummy garbage
 	*out = rx_data[1];
@@ -154,6 +163,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	esp_err_t err = spi_bus_initialize(SPI2_HOST, &bus_config, SPI_DMA_CH_AUTO);
 	if (err != ESP_OK)
 	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "SPI_BUS_INITIALIZE: failed spi bus initialization");
 		ESP_LOGE(TAG, "Failed to initialize SPI bus, error %d", err);
 		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS;
 	}
@@ -169,43 +179,56 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	err = spi_bus_add_device(SPI2_HOST, &spi_dev_config, &imu_data.handle);
 	if (err != ESP_OK)
 	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "SPI_BUS_INITIALIZE: failed spi bus initialization");
 		ESP_LOGE(TAG, "Failed to initialize SPI device, error %d", err);
 		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
 	}
 
 	// INITIALIZATION PROCEDURE
 	// Reset IMU
-	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x81);
+	// Start error collection,
+	err = biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x81);
 
 	// Exit from sleep and select clock 37
-	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	err &= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
 	// Turn off low power mode
-	biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
+	err &= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
 	// ERROR: Retry turning off sleep mode of icm20948
-	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	err &= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
 	// Align output data rate
-	biodyn_imu_icm20948_write_reg(_b2, ODR_ALIGN_EN, 0x00);
+	err &= biodyn_imu_icm20948_write_reg(_b2, ODR_ALIGN_EN, 0x00);
 
 	// Gyroscope config with sample rate divider = 0
-	biodyn_imu_icm20948_write_reg(_b2, GYRO_SMPLRT_DIV, 0x00);
+	err &= biodyn_imu_icm20948_write_reg(_b2, GYRO_SMPLRT_DIV, 0x00);
 
 	// Gyroscope config with range set and digital filter enabled
-	biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, ((GYRO_RANGE_VALUE << 1) | 0x01));
+	err &= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, ((GYRO_RANGE_VALUE << 1) | 0x01));
 
 	// Accelerometer config with sample rate divider = 0
-	biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_1, 0x00);
-	biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_2, 0x00);
+	err &= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_1, 0x00);
+	err &= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_2, 0x00);
 
 	// Acceleromter config with range set and digital filter enabled
-	biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, ((ACCEL_RANGE_VALUE << 1) | 0x01));
+	err &= biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, ((ACCEL_RANGE_VALUE << 1) | 0x01));
+
+	// ERROR CHECKPOINT *INIT1*
+	// Check err status to report any error if found
+	// Possible mismatch due to &'ing errors to error codes,
+	// Resolved only upon further scrutiny?
+	// Due to low occurence over tested code, this is ok? TODO
+	if (err != BIODYN_IMU_OK)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error collected before checkpoint: INIT1. Multiple errors possible.");
+		return err;
+	}
 
 	// Serial interface in SPI mode only
 	uint8_t user_ctrl_data;
-	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
+	err = biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
 	user_ctrl_data |= 0x10;
-	biodyn_imu_icm20948_write_reg(_b2, USER_CTRL, user_ctrl_data);
+	err &= biodyn_imu_icm20948_write_reg(_b2, USER_CTRL, user_ctrl_data);
 
 	// Set bank 0 to get readings
 	// biodyn_imu_icm20948_set_user_bank(_b0);
@@ -214,29 +237,47 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	vTaskDelay(pdMS_TO_TICKS(100));
 
 	// Wake up all sensors
-	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
+	err &= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
 
 	// Turn off low power mode
-	biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
+	err &= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
 	// ERROR: Retry turning off sleep mode of icm20948
-	biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	err &= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+
+	// ERROR CHECKPOINT *INIT2*
+	// Check err status to report any error if found
+	// Possible mismatch due to &'ing errors to error codes,
+	// Resolved only upon further scrutiny?
+	// Due to low occurence over tested code, this is ok? TODO
+	if (err != BIODYN_IMU_OK)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error collected before checkpoint: INIT2. Multiple errors possible.");
+		return err;
+	}
 
 	// Initialize magnetometer
-	biodyn_imu_icm20948_init_magnetomter();
+	err &= biodyn_imu_icm20948_init_magnetomter();
 
 	// Read the magnetometer data from HXL to HZH
 	// i.e., the values of the magnetometer for x,y,z seperated into 2 bytes each
-	err = biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
+	err &= err = biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
 	if (err != ESP_OK)
 	{
-		ESP_LOGE(TAG, "Failed to initialize AK09916 (magnetometer) device, error %d", err);
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in initializing and starting magnetometer. Multiple errors possible");
+		ESP_LOGE(TAG, "Failed to initialize and start AK09916 (magnetometer) device, error %d", err);
 		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
 	}
 	// 8 (not 6) byte read necessary: must sample the status and control register
 	// in order to refresh readings (take from new sample).
 
 	// Self test to ensure proper functionality
-	biodyn_imu_icm20948_self_test();
+	err = biodyn_imu_icm20948_self_test();
+	if (err != ESP_OK)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in completing self-test. Further investigation into self-test part functions likely required.");
+		ESP_LOGE(TAG, "Failed to initialize and start AK09916 (magnetometer) device, error %d", err);
+		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
+	}
 	// TODO: write self_tests for magnetometer
 
 	// Initialize the magnetometer
