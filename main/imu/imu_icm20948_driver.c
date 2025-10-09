@@ -12,6 +12,9 @@
 #define ACCEL_SENSITIVITY_SCALE_FACTOR (1 << (14 - ACCEL_RANGE_VALUE))
 #define GYRO_SENSITIVITY_SCALE_FACTOR 16.4 * (1 << (3 - GYRO_RANGE_VALUE))
 #define MAG_SENSITIVITY_SCALE_FACTOR 4900 / (1 << 14)
+
+// TODO ORGANIZE CODE
+
 // IMU driver data
 static struct
 {
@@ -67,45 +70,53 @@ static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *opti
  */
 static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *optional_attached_message)
 {
-	char *error_msg;
+	char error_msg[128]; // Enough space for message + suffix
+
 	switch (error)
 	{
 	case BIODYN_IMU_OK:
-		error_msg = "BIODYN_IMU_OK\n";
+		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_OK");
 		break;
 	case BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS:
-		error_msg = "BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS\n";
+		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS");
 		break;
 	case BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV:
-		error_msg = "BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV\n";
+		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV");
 		break;
 	case BIODYN_IMU_ERR_COULDNT_SEND_DATA:
-		error_msg = "BIODYN_IMU_ERR_COULDNT_SEND_DATA\n";
+		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_COULDNT_SEND_DATA");
 		break;
 	case BIODYN_IMU_ERR_WRONG_WHOAMI:
-		error_msg = "BIODYN_IMU_ERR_WRONG_WHOAMI\n";
+		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_WRONG_WHOAMI");
 		break;
 	case BIODYN_IMU_ERR_COULDNT_CONFIGURE:
-		error_msg = "BIODYN_IMU_ERR_COULDNT_CONFIGURE\n";
+		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_COULDNT_CONFIGURE");
 		break;
 	case BIODYN_IMU_ERR_COULDNT_READ:
-		error_msg = "BIODYN_IMU_ERR_COULDNT_READ\n";
+		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_COULDNT_READ");
 		break;
 	case BIODYN_IMU_ERR_INVALID_ARGUMENT:
-		error_msg = "BIODYN_IMU_ERR_INVALID_ARGUMENT\n";
+		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_INVALID_ARGUMENT");
 		break;
 	default:
 		// Assume it is an esp error then,
 		// This esp method from esp_err.h also handles unknown errors for us
 		// Only overlap is BIODYN_IMU_OK and ESP_OK, therefore sufficient
-		error_msg = strcat(esp_err_to_name(error), "\n");
+		snprintf(error_msg, sizeof(error_msg), "%s", esp_err_to_name(error));
 		break;
 	}
+
+	strncat(error_msg, "\n", sizeof(error_msg) - strlen(error_msg) - 1);
+
 	if (optional_attached_message != NULL)
 	{
-		error_msg = strcat(error_msg, optional_attached_message);
+		strncat(error_msg, optional_attached_message, sizeof(error_msg) - strlen(error_msg) - 1);
 	}
-	biodyn_imu_icm20948_errors[biodyn_imu_icm20948_error_index] = error_msg;
+
+	strncpy(biodyn_imu_icm20948_errors[biodyn_imu_icm20948_error_index],
+			error_msg,
+			sizeof(biodyn_imu_icm20948_errors[biodyn_imu_icm20948_error_index]) - 1);
+
 	biodyn_imu_icm20948_error_index = (biodyn_imu_icm20948_error_index + 1) % 3;
 	return;
 }
@@ -291,7 +302,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank)
 {
 	// Check if bank is valid: range of [0, 3]
 	if (bank > _b3)
+	{
+		char error_msg[100];
+		sprintf(error_msg, "SET_USER_BANK: invalid argument %d for parameter *bank*", bank);
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, error_msg);
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
+	}
 
 	// only bits [5:4] are for user bank select, rest are reserved
 	// 0x30 -> 00110000 (see datasheet page 67)
@@ -693,4 +709,14 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 
 bool biodyn_imu_icm20948_has_error()
 {
+}
+
+char *biodyn_imu_icm20948_get_error()
+{
+	return NULL;
+}
+
+char **biodyn_imu_icm20948_get_all_errors()
+{
+	return NULL;
 }

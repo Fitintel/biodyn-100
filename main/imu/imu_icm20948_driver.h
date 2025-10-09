@@ -102,11 +102,17 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t r
 
 bool biodyn_imu_icm20948_has_error();
 
+char *biodyn_imu_icm20948_get_error();
+
+// TODO: should subsystem have a method to get all errors? add to imu system?
+// char **biodyn_imu_icm20948_get_all_errors();
+
 const static biodyn_system biodyn_imu_system = {
 	.name = "IMU",
 	.init = biodyn_imu_icm20948_init,
 	.self_test = biodyn_imu_icm20948_self_test,
 	.has_error = biodyn_imu_icm20948_has_error,
+	.get_error = biodyn_imu_icm20948_get_error,
 	// TODO: Add error stuff
 };
 
