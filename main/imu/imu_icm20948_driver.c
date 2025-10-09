@@ -14,6 +14,7 @@
 #define MAG_SENSITIVITY_SCALE_FACTOR 4900 / (1 << 14)
 
 // TODO ORGANIZE CODE
+// TODO consider error trace system? simple push pop stack?
 
 // IMU driver data
 static struct
@@ -58,6 +59,7 @@ static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len);
 static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *optional_attached_message);
 
 // Adds errors to the IMU driver's subsystem error collection. A complete list of biodyn IMU errors can be found below and in imu_icm20948_driver.h
+// For internal (nested) function calls of the driver's own functions, it is not necessary to manually add the error return (duplicate).
 /**
  * BIODYN_IMU_OK 0
  * BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS 0x1
@@ -325,6 +327,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank)
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "SET_USER_BANK: Failed SPI transaction");
 		ESP_LOGE(TAG, "Failed to transmit data over SPI (selecting_user_bank function with bank value %d)", bank);
 		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
 	}
@@ -336,7 +339,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out)
 {
 	// Pointer must be valid
 	if (!bank_out)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "GET_USER_BANK: null pointing argument *bank_out*");
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
+	}
 	// Send address of bank with MSB as the read bit (1)
 	uint8_t tx_data[2] = {REG_BANK_SEL | READ_MSB, 0x00};
 	// Receiving byte array (must be > than minimum non trivial length of tx_data)
@@ -352,7 +358,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out)
 	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "GET_USER_BANK: Failed SPI transaction");
 		return err;
+	}
 
 	// rx[0] is dummy garbage
 	// rx_data[1] contains read data
@@ -366,8 +375,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_ad
 {
 	// Ensure valid pointer
 	if (!out)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "READ_REG: null pointing argument *out*");
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
-
+	}
 	// Identify user bank before selecting register details
 	biodyn_imu_icm20948_set_user_bank(bank);
 	// Send user inputted register addres with MSB as the read bit (1)
@@ -385,8 +396,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_ad
 	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "READ_REG: Failed SPI transaction");
 		return err;
-
+	}
 	// rx_data[1] contains read  and rx[0] is dummy garbage
 	*out = rx_data[1];
 
@@ -398,8 +411,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(uint8_t bank, uint16_t r
 {
 	// Invalid pointer throws an error
 	if (!out || length == 0)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "MULTIBYTE_READ_REG: argument for parameter *out* must be non-zero");
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
-
+	}
 	biodyn_imu_icm20948_set_user_bank(bank);
 	uint8_t *tx_data = malloc(sizeof(uint8_t) * (length + 1));
 	tx_data[0] = register_address | READ_MSB;
@@ -416,6 +431,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(uint8_t bank, uint16_t r
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "MULTIBYTE_READ_REG: Failed SPI transaction");
 		free(tx_data);
 		free(rx_data);
 		return err;
@@ -447,7 +463,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_a
 	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "WRITE_REG: Failed SPI transaction");
 		return err;
+	}
 
 	// Successful write, all clear
 	return BIODYN_IMU_OK;
@@ -461,6 +480,7 @@ static biodyn_imu_err_t self_test_whoami()
 
 	if (whoami != 0xEA)
 	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_WRONG_WHOAMI, "SELF_TEST_WHOAMI: Incorrect whoami response");
 		ESP_LOGE(TAG, "Got wrong WHOAMI response: %x", whoami);
 		return BIODYN_IMU_ERR_WRONG_WHOAMI;
 	}
@@ -476,14 +496,21 @@ static biodyn_imu_err_t self_test_user_banks()
 	// Write non-zero
 	uint8_t write_bank_value = 2;
 	if ((err = biodyn_imu_icm20948_set_user_bank(write_bank_value)))
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "SELF_TEST_USER_BANKS: Failed self-test");
 		return err;
+	}
 
 	// Verify written as non-zero
 	uint8_t initial_bank_value = 0;
 	if ((err = biodyn_imu_icm20948_get_user_bank(&initial_bank_value)))
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "SELF_TEST_USER_BANKS: Failed self-test");
 		return err;
+	}
 	if (initial_bank_value != write_bank_value)
 	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_SEND_DATA, "SELF_TEST_USER_BANKS: Mismatch between written (expected) bank value and received (actual)");
 		ESP_LOGE(TAG, "Failed to write IMU user bank: Tried to write %d got %d",
 				 write_bank_value, initial_bank_value);
 		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
@@ -492,8 +519,10 @@ static biodyn_imu_err_t self_test_user_banks()
 	// Write 0 - restore default
 	write_bank_value = 0;
 	if ((err = biodyn_imu_icm20948_set_user_bank(write_bank_value)))
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "SELF_TEST_USER_BANKS: Failed self-test");
 		return err;
-
+	}
 	ESP_LOGI(TAG, "\tUser banks OK");
 	return BIODYN_IMU_OK;
 }
