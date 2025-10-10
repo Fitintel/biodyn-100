@@ -14,7 +14,7 @@
 #define MAG_SENSITIVITY_SCALE_FACTOR 4900 / (1 << 14)
 
 // TODO ORGANIZE CODE
-// TODO consider error trace system? simple push pop stack?
+// TODO consider error trace system? simple push pop stack? ANSWER: not a priority... yet.
 
 // IMU driver data
 static struct
@@ -37,7 +37,7 @@ static struct
 char *biodyn_imu_icm20948_errors[3] = {0};
 
 // Dictates whether an error exists in the IMU
-bool biodyn_imu_icm20948_has_error = false;
+static bool biodyn_imu_icm20948_has_error = false;
 // An index to add errors to the IMU's error logs
 uint8_t biodyn_imu_icm20948_error_index = 0;
 // TODO: integerate error management into driver
@@ -534,6 +534,7 @@ static biodyn_imu_err_t self_test_gyro()
 	uint8_t gyro2_cfg = 0;
 	if ((err = biodyn_imu_icm20948_read_reg(2, GYRO_CONFIG_2, &gyro2_cfg)))
 	{
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "SELF_TEST_GYRO: Failed self-test");
 		ESP_LOGE(TAG, "Failed to read GYRO_CONFIG_2: %x", err);
 		return err;
 	}
@@ -547,12 +548,12 @@ static biodyn_imu_err_t self_test_gyro()
 
 	// TODO: Write gyro2 config without self-test
 
+	// TODO: Add error logging for above features
+
 	return BIODYN_IMU_OK;
 }
 static biodyn_imu_err_t self_test_mag()
 {
-	biodyn_imu_err_t err;
-
 	// Start self-test on ak09916
 	// Read CNTL_2 to adjust for self-test
 	biodyn_imu_ak09916_read_reg(AK09916_CONTROL2, 1);
@@ -572,6 +573,7 @@ static biodyn_imu_err_t self_test_mag()
 	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &temp);
 	if (temp & 0b00000001)
 		return BIODYN_IMU_OK;
+	biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_MAG: Failed self-test");
 	return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 }
 biodyn_imu_err_t biodyn_imu_icm20948_self_test()
@@ -601,6 +603,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	return BIODYN_IMU_OK;
 }
 
+// TODO: this doesn't look like a proper self-test, check it out?
 biodyn_imu_err_t self_test_accel(int16_t *out)
 {
 	uint8_t low;
@@ -738,14 +741,17 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 
 bool biodyn_imu_icm20948_has_error()
 {
+	return biodyn_imu_icm20948_has_error;
 }
 
 char *biodyn_imu_icm20948_get_error()
 {
-	return NULL;
+	// Go back one index by adding limit - 1  = 2 (since limit is 3)
+	return biodyn_imu_icm20948_errors[(biodyn_imu_icm20948_error_index + 2) % 3];
 }
 
+// TODO return copy of pointer data or the pointer itself? see also above get_error function
 char **biodyn_imu_icm20948_get_all_errors()
 {
-	return NULL;
+	return biodyn_imu_icm20948_errors;
 }
