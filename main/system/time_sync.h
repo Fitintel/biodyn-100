@@ -7,6 +7,9 @@
 // TODO: STUB. Initialize module
 esp_err_t biodyn_time_sync_init();
 
+// TODO: STUB. Return time-sync ticker.
+uint32_t biodyn_time_sync_get_ticker();
+
 // TODO: STUB. Self-test module
 esp_err_t biodyn_time_sync_self_test();
 
