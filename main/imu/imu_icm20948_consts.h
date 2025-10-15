@@ -58,9 +58,6 @@
 #define READ_MSB 0x80
 #define WRITE_MSB 0x00
 
-#define ACCEL_RANGE_VALUE _accel_2g
-#define GYRO_RANGE_VALUE _gyro_1000dps
-
 // Register bank 3
 #define I2C_MST_ODR_CONFIG 0x00
 #define I2C_MST_CTRL 0x01

@@ -9,14 +9,18 @@
 #include "esp_mac.h"
 #include "esp_system.h"
 
-#define ACCEL_SENSITIVITY_SCALE_FACTOR (1 << (14 - ACCEL_RANGE_VALUE))
-#define GYRO_SENSITIVITY_SCALE_FACTOR 16.4 * (1 << (3 - GYRO_RANGE_VALUE))
+static uint8_t accel_range_value = _accel_2g;
+static uint8_t gyro_range_value = _gyro_1000dps;
+
+static uint8_t accel_sensitivity_scale_factor = 0;
+static float gyro_sensitivity_scale_factor = -1;
+
+// TODO reorganize with config
 #define MAG_SENSITIVITY_SCALE_FACTOR 4900 / (1 << 14)
 
 // TODO ORGANIZE CODE
 // TODO consider error trace system? simple push pop stack? ANSWER: not a priority... yet.
 
-// IMU driver data
 static struct
 {
 	i2c_config_t i2c;
@@ -38,9 +42,11 @@ char *biodyn_imu_icm20948_errors[3] = {0};
 
 // Dictates whether an error exists in the IMU
 static bool biodyn_imu_icm20948_has_error = false;
+
 // An index to add errors to the IMU's error logs
 uint8_t biodyn_imu_icm20948_error_index = 0;
-// TODO: integerate error management into driver
+
+// TODO: add/remove necessary function prototypes with reorganization
 
 // Sets the user bank of registers
 static biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank);
@@ -56,6 +62,7 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter();
 static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data);
 // Read multiple bytes from the magnetometer attached to the IMU
 static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len);
+// Adds an error returned by the IMU to it's subsystem
 static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *optional_attached_message);
 
 // Adds errors to the IMU driver's subsystem error collection. A complete list of biodyn IMU errors can be found below and in imu_icm20948_driver.h
@@ -123,7 +130,7 @@ static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *opti
 	return;
 }
 
-// TEST
+// Tests register reading capability
 biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out)
 {
 	// Ensure valid pointer
@@ -198,6 +205,11 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	}
 
 	// INITIALIZATION PROCEDURE
+
+	// Initialize configuration data
+	accel_sensitivity_scale_factor = (1 << (14 - accel_range_value));
+	gyro_sensitivity_scale_factor = 16.4 * (1 << (3 - gyro_range_value));
+
 	// Reset IMU
 	// Start error collection,
 	err = biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x81);
@@ -217,14 +229,14 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	err &= biodyn_imu_icm20948_write_reg(_b2, GYRO_SMPLRT_DIV, 0x00);
 
 	// Gyroscope config with range set and digital filter enabled
-	err &= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, ((GYRO_RANGE_VALUE << 1) | 0x01));
+	err &= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, ((gyro_range_value << 1) | 0x01));
 
 	// Accelerometer config with sample rate divider = 0
 	err &= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_1, 0x00);
 	err &= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_2, 0x00);
 
 	// Acceleromter config with range set and digital filter enabled
-	err &= biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, ((ACCEL_RANGE_VALUE << 1) | 0x01));
+	err &= biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, ((accel_range_value << 1) | 0x01));
 
 	// ERROR CHECKPOINT *INIT1*
 	// Check err status to report any error if found
@@ -300,6 +312,9 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	return BIODYN_IMU_OK;
 }
 
+/** Sets the user bank to @param bank
+ * 	Range of [0, 3]
+ */
 biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank)
 {
 	// Check if bank is valid: range of [0, 3]
@@ -335,6 +350,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank)
 	// Successful write, all clear
 	return BIODYN_IMU_OK;
 }
+
+/** Gets the user bank, with output at @param bank_out
+ * 	Range of [0, 3]
+ */
 biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out)
 {
 	// Pointer must be valid
@@ -371,6 +390,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out)
 	return BIODYN_IMU_OK;
 }
 
+/**
+ * Reads a register from the icm20948 according to the arguments
+ * @param bank the bank the register to read is in
+ * @param register_address the local address of the register within the bank
+ * @param out the output stored read result from the icm20948
+ */
 biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_address, uint8_t *out)
 {
 	// Ensure valid pointer
@@ -407,6 +432,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_ad
 	return BIODYN_IMU_OK;
 }
 
+/**
+ * A multibyte read of the icm20948
+ * @param length the amount of registers to read
+ * Acceptable length between 1 and the amount of registers remaining in the bank after @param register_address
+ * See @fn iodyn_imu_icm20948_read_reg for further details on use
+ */
 biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(uint8_t bank, uint16_t register_address, uint8_t *out, uint8_t length)
 {
 	// Invalid pointer throws an error
@@ -634,19 +665,19 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	int16_t raw_my = (int16_t)((out[17] << 8) | out[16]);
 	int16_t raw_mz = (int16_t)((out[19] << 8) | out[18]);
 
-	data->accel_x = ((float)raw_ax / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
-	data->accel_y = ((float)raw_ay / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
-	data->accel_z = ((float)raw_az / ACCEL_SENSITIVITY_SCALE_FACTOR) * EARTH_GRAVITY;
+	data->accel_x = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
+	data->accel_y = ((float)raw_ay / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
+	data->accel_z = ((float)raw_az / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
 
-	data->gyro_x = (float)raw_gx / GYRO_SENSITIVITY_SCALE_FACTOR;
-	data->gyro_y = (float)raw_gy / GYRO_SENSITIVITY_SCALE_FACTOR;
-	data->gyro_z = (float)raw_gz / GYRO_SENSITIVITY_SCALE_FACTOR;
+	data->gyro_x = (float)raw_gx / gyro_sensitivity_scale_factor;
+	data->gyro_y = (float)raw_gy / gyro_sensitivity_scale_factor;
+	data->gyro_z = (float)raw_gz / gyro_sensitivity_scale_factor;
 
 	data->gyro_x = (float)raw_mx * MAG_SENSITIVITY_SCALE_FACTOR;
 	data->gyro_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
 	data->gyro_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
 
-	ESP_LOGI(TAG, "accel factor should be 16384 was %d", ACCEL_SENSITIVITY_SCALE_FACTOR);
+	ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
 	free(out);
 	return BIODYN_IMU_OK;
 }
@@ -755,3 +786,8 @@ char **biodyn_imu_icm20948_get_all_errors()
 {
 	return biodyn_imu_icm20948_errors;
 }
+
+biodyn_imu_err_t biodyn_imu_icm20948_config_accel(uint8_t accel_dlpfcfg, uint8_t accel_fs_sel, bool accel_fchoice)
+{
+}
+biodyn_imu_err_t biodyn_imu_icm20948_config_accel_sample_averaging(uint8_t dec3_cfg);
