@@ -96,3 +96,6 @@ const char *led_get_error()
 {
 	return led_data.led_error_msg;
 }
+
+esp_err_t led_self_test() {
+}

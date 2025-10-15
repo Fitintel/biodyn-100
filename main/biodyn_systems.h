@@ -2,6 +2,7 @@
 #define BIODYN_SYSTEM_COLLECTION
 
 #include "constants.h"
+#include "system/time_sync.h"
 #include "system/led.h"
 #include "accel/imu_icm20948_driver.h"
 
@@ -9,6 +10,7 @@
 const static biodyn_system biodyn_systems[] = {
 	biodyn_led_system,
 	biodyn_imu_system,
+	biodyn_time_sync_system,
 };
 const static int n_biodyn_systems = LEN_OF_STATIC_ARRAY(biodyn_systems);
 

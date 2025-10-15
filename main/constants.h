@@ -1,6 +1,8 @@
 #ifndef BIODYN_CONSTANTS_H
 #define BIODYN_CONSTANTS_H
 
+#include "esp_system.h"
+
 // Generic constants
 #define BIODYN_DEVICE_NAME "BIODYN-100"
 
@@ -25,7 +27,7 @@ typedef struct biodyn_system
 	esp_err_t (*init)();
 	bool (*has_error)();
 	const char* (*get_error)();
-	const esp_err_t (*self_test)();
+	esp_err_t (*self_test)();
 } biodyn_system;
 
 #endif // BIODYN_CONSTANTS_H
