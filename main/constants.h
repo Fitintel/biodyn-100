@@ -26,7 +26,7 @@ typedef struct biodyn_system
 	const char *name;
 	esp_err_t (*init)();
 	bool (*has_error)();
-	const char* (*get_error)();
+	const char *(*get_error)();
 	esp_err_t (*self_test)();
 } biodyn_system;
 

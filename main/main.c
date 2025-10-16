@@ -70,33 +70,16 @@ void app_main(void)
 	// 	test_accel_gyro_imu_icm20948();
 }
 
-void test_accel_imu_icm20948()
+void test_imu_icm20948()
 {
-	esp_err_t err;
-	int16_t output;
-
-	// vTaskDelay(pdMS_TO_TICKS(100));
-	err = self_test_accel(&output);
+	esp_err_t err = biodyn_imu_icm20948_self_test();
 	if (err != BIODYN_IMU_OK)
 	{
 		ESP_LOGE(MAIN_TAG, "ERROR READING IMU ICM20948 DATA");
 	}
 	else
 	{
-		ESP_LOGI(MAIN_TAG, "GOT X ACCEL LOW AS %d", output);
-	}
-
-	for (int i = 0; i < 20000; ++i)
-	{
-		// vTaskDelay(pdMS_TO_TICKS(100));
-		err = self_test_accel(&output);
-		if (err != BIODYN_IMU_OK)
-		{
-			ESP_LOGE(MAIN_TAG, "ERROR READING IMU ICM20948 DATA");
-			continue;
-		}
-		ESP_LOGI(MAIN_TAG, "GOT X ACCEL AS %d %s", output, IMU_ACCEL_UNIT);
-		vTaskDelay(pdMS_TO_TICKS(100)); // Sleep for 1000 ms (1 second)
+		ESP_LOGI(MAIN_TAG, "Succesful self-test of IMU.");
 	}
 	return;
 }
@@ -150,21 +133,21 @@ void test_accel_imu_icm20948()
 // 	return;
 // }
 
-// void test_accel_gyro_mag_imu_icm20948()
-// {
-// 	imu_motion_data data = {0};
-// 	for (int i = 0; i < 2000; ++i)
-// 	{
-// 		biodyn_imu_icm20948_read_accel_gyro(&data);
-// 		ESP_LOGI(MAIN_TAG, "ACCEL X: %.3f %s", data.accel_x, IMU_ACCEL_UNIT);
-// 		ESP_LOGI(MAIN_TAG, "ACCEL Y: %.3f %s", data.accel_y, IMU_ACCEL_UNIT);
-// 		ESP_LOGI(MAIN_TAG, "ACCEL Z: %.3f %s", data.accel_z, IMU_ACCEL_UNIT);
-// 		ESP_LOGI(MAIN_TAG, "GYRO X: %.3f %s", data.gyro_x, IMU_GYRO_UNIT);
-// 		ESP_LOGI(MAIN_TAG, "GYRO Y: %.3f %s", data.gyro_y, IMU_GYRO_UNIT);
-// 		ESP_LOGI(MAIN_TAG, "GYRO Z: %.3f %s", data.gyro_z, IMU_GYRO_UNIT);
-// 		ESP_LOGI(MAIN_TAG, "MAG X: %.3f %s", data.mag_x, IMU_MAG_UNIT);
-// 		ESP_LOGI(MAIN_TAG, "MAG Y: %.3f %s", data.mag_y, IMU_MAG_UNIT);
-// 		ESP_LOGI(MAIN_TAG, "MAG Z: %.3f %s", data.mag_z, IMU_MAG_UNIT);
-// 		vTaskDelay(pdMS_TO_TICKS(100)); // Sleep for 100 ms (0.1 second)
-// 	}
-// }
+void test_accel_gyro_mag_imu_icm20948()
+{
+	imu_motion_data data = {0};
+	for (int i = 0; i < 2000; ++i)
+	{
+		biodyn_imu_icm20948_read_accel_gyro_mag(&data);
+		ESP_LOGI(MAIN_TAG, "ACCEL X: %.3f %s", data.accel_x, IMU_ACCEL_UNIT);
+		ESP_LOGI(MAIN_TAG, "ACCEL Y: %.3f %s", data.accel_y, IMU_ACCEL_UNIT);
+		ESP_LOGI(MAIN_TAG, "ACCEL Z: %.3f %s", data.accel_z, IMU_ACCEL_UNIT);
+		ESP_LOGI(MAIN_TAG, "GYRO X: %.3f %s", data.gyro_x, IMU_GYRO_UNIT);
+		ESP_LOGI(MAIN_TAG, "GYRO Y: %.3f %s", data.gyro_y, IMU_GYRO_UNIT);
+		ESP_LOGI(MAIN_TAG, "GYRO Z: %.3f %s", data.gyro_z, IMU_GYRO_UNIT);
+		ESP_LOGI(MAIN_TAG, "MAG X: %.3f %s", data.mag_x, IMU_MAG_UNIT);
+		ESP_LOGI(MAIN_TAG, "MAG Y: %.3f %s", data.mag_y, IMU_MAG_UNIT);
+		ESP_LOGI(MAIN_TAG, "MAG Z: %.3f %s", data.mag_z, IMU_MAG_UNIT);
+		vTaskDelay(pdMS_TO_TICKS(100)); // Sleep for 100 ms (0.1 second)
+	}
+}
