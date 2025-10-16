@@ -477,6 +477,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(uint8_t bank, uint16_t r
 	return BIODYN_IMU_OK;
 }
 
+/**
+ * Writes to a register of the icm20948 according to the arguments
+ * @param bank the bank the register to write to is in
+ * @param register_address the local address of the register within the bank
+ * @param write_data the data to write to the imu
+ */
 biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data)
 {
 	// Select user bank to write to
@@ -503,7 +509,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_a
 	return BIODYN_IMU_OK;
 }
 
-// Self-test functions
+/**
+ * Self-test on the whoami of the IMU.
+ * Checks the whoami register of the IMU which should always be readable.
+ */
 static biodyn_imu_err_t self_test_whoami()
 {
 	uint8_t whoami;
@@ -520,6 +529,11 @@ static biodyn_imu_err_t self_test_whoami()
 
 	return BIODYN_IMU_OK;
 }
+
+/**
+ * Self-test the user banks of the IMU.
+ * Checks whether it is possible to swap between banks, and ensures these changes are accurately reflected in the internal state of the IMU.
+ */
 static biodyn_imu_err_t self_test_user_banks()
 {
 	biodyn_imu_err_t err = 0;
@@ -557,6 +571,25 @@ static biodyn_imu_err_t self_test_user_banks()
 	ESP_LOGI(TAG, "\tUser banks OK");
 	return BIODYN_IMU_OK;
 }
+
+// TODO: this doesn't look like a proper self-test, check it out?
+// TODO: also check gyro self-test
+biodyn_imu_err_t self_test_accel()
+{
+	uint8_t low;
+	uint8_t high;
+	int16_t *out = 0;
+	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_L, &low);
+	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_H, &high);
+	*out = ((int16_t)high << 8) | low;
+	*out *= (9.81 / 4096);
+	return BIODYN_IMU_OK;
+}
+
+/**
+ * Self-test the gyroscope of the IMU.
+ * Checks the built-in self-test in the IMU, which identifies if it's gyroscope is working.
+ */
 static biodyn_imu_err_t self_test_gyro()
 {
 	biodyn_imu_err_t err;
@@ -583,6 +616,11 @@ static biodyn_imu_err_t self_test_gyro()
 
 	return BIODYN_IMU_OK;
 }
+
+/**
+ * Self-test the magnetometer of the IMU.
+ * Uses the built-in structure of the AK09916 to perform self-tests on it's condition.
+ */
 static biodyn_imu_err_t self_test_mag()
 {
 	// Start self-test on ak09916
@@ -607,6 +645,11 @@ static biodyn_imu_err_t self_test_mag()
 	biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_MAG: Failed self-test");
 	return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 }
+
+/**
+ * Self-test on the entire IMU.
+ * Consists of multiple separate self-tests.
+ */
 biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 {
 	ESP_LOGI(TAG, "Running self test");
@@ -628,24 +671,27 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	{
 		ESP_LOGE(TAG, "Self test failed - gyro (%x)", err);
 	}
-	// TODO: Run accel self-test
-	// TODO: Run mag self-test
+	// Run accel self-test
+	if ((err = self_test_accel()))
+	{
+		ESP_LOGE(TAG, "Self test failed - accel (%x)", err);
+	}
+	// Run mag self-test
+	if ((err = self_test_mag()))
+	{
+		ESP_LOGE(TAG, "Self test failed - mag (%x)", err);
+	}
 
 	return BIODYN_IMU_OK;
 }
 
-// TODO: this doesn't look like a proper self-test, check it out?
-biodyn_imu_err_t self_test_accel(int16_t *out)
-{
-	uint8_t low;
-	uint8_t high;
-	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_L, &low);
-	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_H, &high);
-	*out = ((int16_t)high << 8) | low;
-	*out *= (9.81 / 4096);
-	return BIODYN_IMU_OK;
-}
-
+/**
+ * Reads accelerometer, gyroscope, and magnetometer data in one read (18 bytes total).
+ * Returns an imu_motion_data type with the output data of the icm20948 and ak09916 for their respective measurements.
+ * See imu_motion_data type in @file imu_icm20948_driver.h
+ * @param data the output data from the read of the IMU
+ * Must be of type imu_motion_data
+ */
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 {
 	uint8_t out_length = 18;
@@ -682,14 +728,20 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	return BIODYN_IMU_OK;
 }
 
-// Writes into the magnetometer attached to the ICM20948
-static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
+/**
+ * Writes to a register in the magnetometer of the IMU.
+ * Requires sufficient delay due to I2C interactions between icm20948 and ak09916.
+ * @param register_address the register address to write to within the ak09916 register bank
+ * @param data the data to write within the requested register
+ * Take care to ensure the register you write to is an ak09916 register and not an icm20948 register.
+ */
+static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t register_address, uint8_t data)
 {
 	// Set slave0 to be the built in magnetometer
 	// Or first bit with 0 in order to indicate write
 	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x00 | AK09916_ADDRESS);
 	// Set the register to write to
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, register_address);
 	// Set the data to write
 	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_DO, data);
 
@@ -702,14 +754,20 @@ static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data)
 	return BIODYN_IMU_OK;
 }
 
-// Reads into the magnetometer attached to the ICM20948
-static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len)
+/**
+ * Reads a register in the magnetometer of the IMU.
+ * Requires sufficient delay due to I2C interactions between icm20948 and ak09916.
+ * @param register_address the register address to read from within the ak09916 register bank
+ * @param len the amount of data to read (i.e. you may multibyte read from this function, up to the limits of the amount of ext_slv_sens_data registers available)
+ * Take care to ensure the register you write to is an ak09916 register and not an icm20948 register.
+ */
+static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t register_address, uint8_t len)
 {
 	// Set slave0 to be the built in magnetometer
 	// Or first bit with 1 in order to indicate read
 	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x80 | AK09916_ADDRESS);
 	// Set the register to read from
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, reg);
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, register_address);
 
 	// Enable and single data write
 	// TODO: see biodyn_imu_ak09916_write_reg function
@@ -721,6 +779,10 @@ static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len)
 	return BIODYN_IMU_OK;
 }
 
+/**
+ * Initializes the magnetometer (i.e. the ak09916) within the IMU (via the icm20948).
+ * Prerequisitely, the icm20948 must be somewhat initialized first.
+ */
 static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 {
 	uint8_t temp;
@@ -770,11 +832,17 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 	return BIODYN_IMU_OK;
 }
 
+/**
+ * Returns whether the IMU is currently in a state of error
+ */
 bool biodyn_imu_icm20948_has_error()
 {
 	return biodyn_imu_icm20948_has_error;
 }
-
+/**
+ * Returns the most recent error of the IMU.
+ * Returns a blank string if there are no errors.
+ */
 char *biodyn_imu_icm20948_get_error()
 {
 	// Go back one index by adding limit - 1  = 2 (since limit is 3)
@@ -782,11 +850,12 @@ char *biodyn_imu_icm20948_get_error()
 }
 
 // TODO return copy of pointer data or the pointer itself? see also above get_error function
-char **biodyn_imu_icm20948_get_all_errors()
-{
-	return biodyn_imu_icm20948_errors;
-}
+// char **biodyn_imu_icm20948_get_all_errors()
+// {
+// 	return biodyn_imu_icm20948_errors;
+// }
 
+// TODO
 biodyn_imu_err_t biodyn_imu_icm20948_config_accel(uint8_t accel_dlpfcfg, uint8_t accel_fs_sel, bool accel_fchoice)
 {
 }
