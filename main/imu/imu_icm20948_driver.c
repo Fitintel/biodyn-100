@@ -41,7 +41,7 @@ static struct
 char *biodyn_imu_icm20948_errors[3] = {0};
 
 // Dictates whether an error exists in the IMU
-static bool biodyn_imu_icm20948_has_error = false;
+static bool biodyn_imu_icm20948_in_error = false;
 
 // An index to add errors to the IMU's error logs
 uint8_t biodyn_imu_icm20948_error_index = 0;
@@ -79,6 +79,7 @@ static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *opti
  */
 static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *optional_attached_message)
 {
+	biodyn_imu_icm20948_in_error = true;
 	char error_msg[128]; // Enough space for message + suffix
 
 	switch (error)
@@ -215,28 +216,28 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	err = biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x81);
 
 	// Exit from sleep and select clock 37
-	err &= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
 	// Turn off low power mode
-	err &= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
+	err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
 	// ERROR: Retry turning off sleep mode of icm20948
-	err &= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
 	// Align output data rate
-	err &= biodyn_imu_icm20948_write_reg(_b2, ODR_ALIGN_EN, 0x00);
+	err |= biodyn_imu_icm20948_write_reg(_b2, ODR_ALIGN_EN, 0x00);
 
 	// Gyroscope config with sample rate divider = 0
-	err &= biodyn_imu_icm20948_write_reg(_b2, GYRO_SMPLRT_DIV, 0x00);
+	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_SMPLRT_DIV, 0x00);
 
 	// Gyroscope config with range set and digital filter enabled
-	err &= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, ((gyro_range_value << 1) | 0x01));
+	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, ((gyro_range_value << 1) | 0x01));
 
 	// Accelerometer config with sample rate divider = 0
-	err &= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_1, 0x00);
-	err &= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_2, 0x00);
+	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_1, 0x00);
+	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_2, 0x00);
 
 	// Acceleromter config with range set and digital filter enabled
-	err &= biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, ((accel_range_value << 1) | 0x01));
+	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, ((accel_range_value << 1) | 0x01));
 
 	// ERROR CHECKPOINT *INIT1*
 	// Check err status to report any error if found
@@ -251,9 +252,9 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 
 	// Serial interface in SPI mode only
 	uint8_t user_ctrl_data;
-	err = biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
+	err |= biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
 	user_ctrl_data |= 0x10;
-	err &= biodyn_imu_icm20948_write_reg(_b2, USER_CTRL, user_ctrl_data);
+	err |= biodyn_imu_icm20948_write_reg(_b2, USER_CTRL, user_ctrl_data);
 
 	// Set bank 0 to get readings
 	// biodyn_imu_icm20948_set_user_bank(_b0);
@@ -262,12 +263,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	vTaskDelay(pdMS_TO_TICKS(100));
 
 	// Wake up all sensors
-	err &= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
+	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
 
 	// Turn off low power mode
-	err &= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
+	err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
 	// ERROR: Retry turning off sleep mode of icm20948
-	err &= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
 	// ERROR CHECKPOINT *INIT2*
 	// Check err status to report any error if found
@@ -281,11 +282,11 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	}
 
 	// Initialize magnetometer
-	err &= biodyn_imu_icm20948_init_magnetomter();
+	err |= biodyn_imu_icm20948_init_magnetomter();
 
 	// Read the magnetometer data from HXL to HZH
 	// i.e., the values of the magnetometer for x,y,z seperated into 2 bytes each
-	err &= err = biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
+	err |= biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
 	if (err != ESP_OK)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in initializing and starting magnetometer. Multiple errors possible");
@@ -296,7 +297,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// in order to refresh readings (take from new sample).
 
 	// Self test to ensure proper functionality
-	err = biodyn_imu_icm20948_self_test();
+	err |= biodyn_imu_icm20948_self_test();
 	if (err != ESP_OK)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in completing self-test. Further investigation into self-test part functions likely required.");
@@ -574,7 +575,7 @@ static biodyn_imu_err_t self_test_user_banks()
 
 // TODO: this doesn't look like a proper self-test, check it out?
 // TODO: also check gyro self-test
-biodyn_imu_err_t self_test_accel()
+static biodyn_imu_err_t self_test_accel()
 {
 	uint8_t low;
 	uint8_t high;
@@ -837,13 +838,13 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
  */
 bool biodyn_imu_icm20948_has_error()
 {
-	return biodyn_imu_icm20948_has_error;
+	return false;
 }
 /**
  * Returns the most recent error of the IMU.
  * Returns a blank string if there are no errors.
  */
-char *biodyn_imu_icm20948_get_error()
+const char *biodyn_imu_icm20948_get_error()
 {
 	// Go back one index by adding limit - 1  = 2 (since limit is 3)
 	return biodyn_imu_icm20948_errors[(biodyn_imu_icm20948_error_index + 2) % 3];
@@ -858,5 +859,9 @@ char *biodyn_imu_icm20948_get_error()
 // TODO
 biodyn_imu_err_t biodyn_imu_icm20948_config_accel(uint8_t accel_dlpfcfg, uint8_t accel_fs_sel, bool accel_fchoice)
 {
+	return BIODYN_IMU_OK;
 }
-biodyn_imu_err_t biodyn_imu_icm20948_config_accel_sample_averaging(uint8_t dec3_cfg);
+biodyn_imu_err_t biodyn_imu_icm20948_config_accel_sample_averaging(uint8_t dec3_cfg)
+{
+	return BIODYN_IMU_OK;
+}

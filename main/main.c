@@ -70,33 +70,16 @@ void app_main(void)
 	// 	test_accel_gyro_imu_icm20948();
 }
 
-void test_accel_imu_icm20948()
+void test_imu_icm20948()
 {
-	esp_err_t err;
-	int16_t output;
-
-	// vTaskDelay(pdMS_TO_TICKS(100));
-	err = self_test_accel(&output);
+	esp_err_t err = biodyn_imu_icm20948_self_test();
 	if (err != BIODYN_IMU_OK)
 	{
 		ESP_LOGE(MAIN_TAG, "ERROR READING IMU ICM20948 DATA");
 	}
 	else
 	{
-		ESP_LOGI(MAIN_TAG, "GOT X ACCEL LOW AS %d", output);
-	}
-
-	for (int i = 0; i < 20000; ++i)
-	{
-		// vTaskDelay(pdMS_TO_TICKS(100));
-		err = self_test_accel(&output);
-		if (err != BIODYN_IMU_OK)
-		{
-			ESP_LOGE(MAIN_TAG, "ERROR READING IMU ICM20948 DATA");
-			continue;
-		}
-		ESP_LOGI(MAIN_TAG, "GOT X ACCEL AS %d %s", output, IMU_ACCEL_UNIT);
-		vTaskDelay(pdMS_TO_TICKS(100)); // Sleep for 1000 ms (1 second)
+		ESP_LOGI(MAIN_TAG, "Succesful self-test of IMU.");
 	}
 	return;
 }

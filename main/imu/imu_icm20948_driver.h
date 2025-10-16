@@ -74,7 +74,7 @@ typedef struct i2c_config i2c_config_t;
 
 // BIODYN IMU driver error code type: BIODYN_IMU_ERR_
 typedef esp_err_t biodyn_imu_err_t;
-// NOTICE: new errors added here must also be updated in biodyn_imu_icm20948_has_error() function.
+// NOTICE: new errors added here must also be updated in biodyn_imu_icm20948_add_error_to_subsystem() function.
 #define BIODYN_IMU_OK 0
 #define BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS 0x1
 #define BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV 0x2
@@ -93,7 +93,6 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test();
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data);
 
 // TEMPORARY test to work out accel gyro multibyte reading
-biodyn_imu_err_t self_test_accel(int16_t *out);
 
 // Reads and returns compass data
 biodyn_imu_err_t biodyn_imu_icm20948_read_magnetometer(imu_float3_t *out);
@@ -105,7 +104,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t r
 bool biodyn_imu_icm20948_has_error();
 
 // Retrieves most recent error returned by the IMU. If no error is present, returns an empty string.
-char *biodyn_imu_icm20948_get_error();
+const char *biodyn_imu_icm20948_get_error();
 
 // TODO: should subsystem have a method to get all errors? add to imu system?
 // char **biodyn_imu_icm20948_get_all_errors();
