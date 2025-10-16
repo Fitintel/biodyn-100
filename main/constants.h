@@ -24,8 +24,9 @@ typedef struct biodyn_system
 	const char *name;
 	esp_err_t (*init)();
 	bool (*has_error)();
-	const char* (*get_error)();
-	const esp_err_t (*self_test)();
+	const char *(*get_error)();
+	esp_err_t (*self_test)();
+	// ^ Keyword "const" unnecessary for this one ^
 } biodyn_system;
 
 #endif // BIODYN_CONSTANTS_H
