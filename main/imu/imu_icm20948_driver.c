@@ -691,6 +691,64 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	return BIODYN_IMU_OK;
 }
 
+// -----------------------------BLUETOOTH HANDLE FUNCTIONS-----------------------------
+/**
+ * Reads the accelerometer data of the IMU with bluetooth compatability
+ * Returns the converted, scaled, and signed output that is then converted into a binary stream for external (pointer)
+ * @param size the amount of bytes to be read from out
+ * @param out the output data from the IMU read of the accelerometer registers
+ */
+void biodyn_imu_icm20948_read_accel(uint16_t *size, void *out);
+
+/**
+ * Reads the gyroscope data of the IMU with bluetooth compatability
+ * Returns the converted, scaled, and signed output that is then converted into a binary stream for external (pointer)
+ * @param size the amount of bytes to be read from out
+ * @param out the output data from the IMU read of the gyroscope registers
+ */
+void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out);
+
+/**
+ * Reads the magnetometer data of the IMU with bluetooth compatability
+ * Returns the converted, scaled, and signed output that is then converted into a binary stream for external (pointer)
+ * @param size the amount of bytes to be read from out
+ * @param out the output data from the IMU read of the magnetometer registers
+ */
+void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out);
+
+/**
+ * Simple serializer for imu motion data into readable byte stream
+ */
+static uint8_t *serialize_imu_data(const imu_motion_data *data, size_t *out_size)
+{
+	*out_size = sizeof(imu_motion_data);
+	uint8_t *buffer = (uint8_t *)malloc(*out_size);
+	if (buffer == NULL)
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "IMU_SERIALIZE: could not allocate memory for buffer");
+		*out_size = 0;
+		return NULL; // Handle allocation failure
+	}
+
+	memcpy(buffer, data, *out_size);
+	return buffer;
+}
+
+/**
+ * Reads the accelerometer, gyroscope, and magnetometer data of the IMU with bluetooth compatability
+ * Returns the converted, scaled, and signed output that is then converted into a binary stream for external (pointer)
+ * @param size the amount of bytes to be read from out
+ * @param out the output data from the IMU of all relevant registers
+ */
+void biodyn_imu_icm20948_read_all(uint16_t *size, void *out)
+{
+	imu_motion_data imd = {0};
+	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
+	out = serialize_imu_data(&imd, size);
+}
+
+// -----------------------------BLUETOOTH HANDLE FUNCTIONS-----------------------------
+
 /**
  * Reads accelerometer, gyroscope, and magnetometer data in one read (18 bytes total).
  * Returns an imu_motion_data type with the output data of the icm20948 and ak09916 for their respective measurements.

@@ -90,12 +90,17 @@ biodyn_imu_err_t biodyn_imu_icm20948_init();
 // Performs an IMU self-test
 biodyn_imu_err_t biodyn_imu_icm20948_self_test();
 
+// -----------------------------BLUETOOTH HANDLE FUNCTIONS-----------------------------
+void biodyn_imu_icm20948_read_accel(uint16_t *size, void *out);
+
+void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out);
+
+void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out);
+
+void biodyn_imu_icm20948_read_all(uint16_t *size, void *out);
+// -----------------------------BLUETOOTH HANDLE FUNCTIONS-----------------------------
+
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data);
-
-// TEMPORARY test to work out accel gyro multibyte reading
-
-// Reads and returns compass data
-biodyn_imu_err_t biodyn_imu_icm20948_read_magnetometer(imu_float3_t *out);
 
 // Tests register reading capability
 biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out);
