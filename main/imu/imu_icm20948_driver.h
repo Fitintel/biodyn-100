@@ -114,7 +114,6 @@ const static biodyn_system biodyn_imu_system = {
 	.self_test = biodyn_imu_icm20948_self_test,
 	.has_error = biodyn_imu_icm20948_has_error,
 	.get_error = biodyn_imu_icm20948_get_error,
-	// TODO: Add error stuff
 };
 
 // TODO: What other types of calls do we want by our app via bluetooth?

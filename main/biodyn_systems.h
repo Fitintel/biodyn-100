@@ -9,7 +9,7 @@
 // Order is order of initialization
 const static biodyn_system biodyn_systems[] = {
 	biodyn_led_system,
-	// biodyn_imu_system,
+	biodyn_imu_system,
 	// biodyn_time_sync_system,
 };
 const static int n_biodyn_systems = LEN_OF_STATIC_ARRAY(biodyn_systems);

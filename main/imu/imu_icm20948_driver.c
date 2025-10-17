@@ -38,7 +38,7 @@ static struct
 // IMU error list
 // Collects up to 3 errors before overwriting
 // 3 is arbitrarilty and can be further worked upon: TODO
-char *biodyn_imu_icm20948_errors[3] = {0};
+char biodyn_imu_icm20948_errors[3][128] = {0};
 
 // Dictates whether an error exists in the IMU
 static bool biodyn_imu_icm20948_in_error = false;
@@ -88,25 +88,25 @@ static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *opti
 		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_OK");
 		break;
 	case BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS:
-		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS");
+		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_INIT_SPI_BUS");
 		break;
 	case BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV:
-		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV");
+		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_INIT_SPI_DEV");
 		break;
 	case BIODYN_IMU_ERR_COULDNT_SEND_DATA:
-		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_COULDNT_SEND_DATA");
+		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_SEND_DATA");
 		break;
 	case BIODYN_IMU_ERR_WRONG_WHOAMI:
-		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_WRONG_WHOAMI");
+		snprintf(error_msg, sizeof(error_msg), "IMU_WRONG_WHOAMI");
 		break;
 	case BIODYN_IMU_ERR_COULDNT_CONFIGURE:
-		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_COULDNT_CONFIGURE");
+		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_CONFIGURE");
 		break;
 	case BIODYN_IMU_ERR_COULDNT_READ:
-		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_COULDNT_READ");
+		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_READ");
 		break;
 	case BIODYN_IMU_ERR_INVALID_ARGUMENT:
-		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_ERR_INVALID_ARGUMENT");
+		snprintf(error_msg, sizeof(error_msg), "IMU_INVALID_ARGUMENT");
 		break;
 	default:
 		// Assume it is an esp error then,
@@ -122,7 +122,6 @@ static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *opti
 	{
 		strncat(error_msg, optional_attached_message, sizeof(error_msg) - strlen(error_msg) - 1);
 	}
-
 	strncpy(biodyn_imu_icm20948_errors[biodyn_imu_icm20948_error_index],
 			error_msg,
 			sizeof(biodyn_imu_icm20948_errors[biodyn_imu_icm20948_error_index]) - 1);
@@ -521,8 +520,8 @@ static biodyn_imu_err_t self_test_whoami()
 
 	if (whoami != 0xEA)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_WRONG_WHOAMI, "SELF_TEST_WHOAMI: Incorrect whoami response");
 		ESP_LOGE(TAG, "Got wrong WHOAMI response: %x", whoami);
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_WRONG_WHOAMI, "SELF_TEST_WHOAMI: Incorrect whoami response");
 		return BIODYN_IMU_ERR_WRONG_WHOAMI;
 	}
 
@@ -661,11 +660,13 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	if ((err = self_test_whoami()))
 	{
 		ESP_LOGE(TAG, "Self test failed - whoami (%x)", err);
+		return err;
 	}
 	// Check that user bank selection works
 	if ((err = self_test_user_banks()))
 	{
 		ESP_LOGE(TAG, "Self test failed - user banks (%x)", err);
+		return err;
 	}
 	// Run gyro self-test
 	if ((err = self_test_gyro()))
@@ -838,7 +839,7 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
  */
 bool biodyn_imu_icm20948_has_error()
 {
-	return false;
+	return biodyn_imu_icm20948_in_error;
 }
 /**
  * Returns the most recent error of the IMU.
