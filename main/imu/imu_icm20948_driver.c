@@ -409,7 +409,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_ad
 	// Send user inputted register addres with MSB as the read bit (1)
 	uint8_t tx_data[2] = {register_address | READ_MSB, 0x00};
 	// Empty receiving byte array
-	uint8_t rx_data[2] = {0};
+	uint8_t rx_data[2] = {0,0};
 
 	// length 2 (bytes) = max{rx_data length, tx_data length}
 	spi_transaction_t trans = {
@@ -425,6 +425,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_ad
 		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "READ_REG: Failed SPI transaction");
 		return err;
 	}
+
 	// rx_data[1] contains read  and rx[0] is dummy garbage
 	*out = rx_data[1];
 
@@ -578,11 +579,13 @@ static biodyn_imu_err_t self_test_accel()
 {
 	uint8_t low;
 	uint8_t high;
-	int16_t *out = 0;
+	int16_t out = 0;
 	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_L, &low);
 	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_H, &high);
-	*out = ((int16_t)high << 8) | low;
-	*out *= (9.81 / 4096);
+
+	out = (((int16_t)high) << 8) | low;
+	out *= (9.81 / 4096);
+
 	return BIODYN_IMU_OK;
 }
 
@@ -678,6 +681,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	{
 		ESP_LOGE(TAG, "Self test failed - accel (%x)", err);
 	}
+
 	// Run mag self-test
 	if ((err = self_test_mag()))
 	{
