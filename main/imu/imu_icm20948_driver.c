@@ -12,7 +12,7 @@
 static uint8_t accel_range_value = _accel_2g;
 static uint8_t gyro_range_value = _gyro_1000dps;
 
-static uint8_t accel_sensitivity_scale_factor = 0;
+static uint16_t accel_sensitivity_scale_factor = 0;
 static float gyro_sensitivity_scale_factor = -1;
 
 // TODO reorganize with config
@@ -207,8 +207,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// INITIALIZATION PROCEDURE
 
 	// Initialize configuration data
-	accel_sensitivity_scale_factor = (1 << (14 - accel_range_value));
+	accel_sensitivity_scale_factor = (1 << (uint16_t) (14 - accel_range_value));
 	gyro_sensitivity_scale_factor = 16.4 * (1 << (3 - gyro_range_value));
+	ESP_LOGI(TAG, "\tPlanar sensitivity factor: %d", accel_sensitivity_scale_factor);
+	ESP_LOGI(TAG, "\tGyro sensitivity factor: %f", gyro_sensitivity_scale_factor);
 
 	// Reset IMU
 	// Start error collection,
@@ -251,7 +253,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 
 	// Serial interface in SPI mode only
 	uint8_t user_ctrl_data;
-	err |= biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
+	err |= biodyn_imu_icm20948_eead_reg(_b0, USER_CTRL, &user_ctrl_data);
 	user_ctrl_data |= 0x10;
 	err |= biodyn_imu_icm20948_write_reg(_b2, USER_CTRL, user_ctrl_data);
 
@@ -698,7 +700,14 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
  * @param size the amount of bytes to be read from out
  * @param out the output data from the IMU read of the accelerometer registers
  */
-void biodyn_imu_icm20948_read_accel(uint16_t *size, void *out);
+void biodyn_imu_icm20948_read_accel(uint16_t *size, void *out)
+{
+	// ASSUMES imu_motion_data has gyro xyz in that order
+	imu_motion_data imd = {0};
+	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
+	memcpy(out, &(imd.accel_x), sizeof(float) * 3);
+	*size = sizeof(float) * 3;
+}
 
 /**
  * Reads the gyroscope data of the IMU with bluetooth compatability
@@ -706,7 +715,14 @@ void biodyn_imu_icm20948_read_accel(uint16_t *size, void *out);
  * @param size the amount of bytes to be read from out
  * @param out the output data from the IMU read of the gyroscope registers
  */
-void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out);
+void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out)
+{
+	// ASSUMES imu_motion_data has gyro xyz in that order
+	imu_motion_data imd = {0};
+	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
+	memcpy(out, &(imd.gyro_x), sizeof(float) * 3);
+	*size = sizeof(float) * 3;
+}
 
 /**
  * Reads the magnetometer data of the IMU with bluetooth compatability
@@ -714,24 +730,13 @@ void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out);
  * @param size the amount of bytes to be read from out
  * @param out the output data from the IMU read of the magnetometer registers
  */
-void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out);
-
-/**
- * Simple serializer for imu motion data into readable byte stream
- */
-static uint8_t *serialize_imu_data(const imu_motion_data *data, size_t *out_size)
+void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out)
 {
-	*out_size = sizeof(imu_motion_data);
-	uint8_t *buffer = (uint8_t *)malloc(*out_size);
-	if (buffer == NULL)
-	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "IMU_SERIALIZE: could not allocate memory for buffer");
-		*out_size = 0;
-		return NULL; // Handle allocation failure
-	}
-
-	memcpy(buffer, data, *out_size);
-	return buffer;
+	// ASSUMES imu_motion_data has mag xyz in that order
+	imu_motion_data imd = {0};
+	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
+	memcpy(out, &(imd.mag_x), sizeof(float) * 3);
+	*size = sizeof(float) * 3;
 }
 
 /**
@@ -744,7 +749,8 @@ void biodyn_imu_icm20948_read_all(uint16_t *size, void *out)
 {
 	imu_motion_data imd = {0};
 	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
-	out = serialize_imu_data(&imd, size);
+	memcpy(out, &imd, sizeof(imu_motion_data));
+	*size = sizeof(imu_motion_data);
 }
 
 // -----------------------------BLUETOOTH HANDLE FUNCTIONS-----------------------------
