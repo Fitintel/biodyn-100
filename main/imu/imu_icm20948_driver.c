@@ -409,7 +409,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_ad
 	// Send user inputted register addres with MSB as the read bit (1)
 	uint8_t tx_data[2] = {register_address | READ_MSB, 0x00};
 	// Empty receiving byte array
-	uint8_t rx_data[2] = {0,0};
+	uint8_t rx_data[2] = {0, 0};
 
 	// length 2 (bytes) = max{rx_data length, tx_data length}
 	spi_transaction_t trans = {
@@ -643,7 +643,7 @@ static biodyn_imu_err_t self_test_mag()
 
 	biodyn_imu_ak09916_read_reg(AK09916_STATUS1, 1);
 	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &temp);
-	if (temp & 0b00000001)
+	if (temp & 0b11111111)
 		return BIODYN_IMU_OK;
 	biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_MAG: Failed self-test");
 	return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
