@@ -5,30 +5,30 @@
 #include "bluetooth/ble.h"
 
 const static struct biodyn_ble_characteristic data_fast_chars[] = {
-	{
-		.name = "Packed Planar Accel Data",
-		.uuid = BIODYN_BLE_UUID_16(0x4150),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		// TODO: Implement packed planar accel read
-		// .get_data = ,
-	},
-	{
-		.name = "Packed Gyro Accel Data",
-		.uuid = BIODYN_BLE_UUID_16(0x4151),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		// TODO: Implement packed gyro accel read
-		// .get_data = ,
-	},
-	{
-		.name = "Packed Magnetometer Data",
-		.uuid = BIODYN_BLE_UUID_16(0x4152),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		// TODO: Implement packed magnetometer read
-		// .get_data = ,
-	},
+	// {
+	// 	.name = "Packed Planar Accel Data",
+	// 	.uuid = BIODYN_BLE_UUID_16(0x4150),
+	// 	.permissions = BIODYN_PERM_READ,
+	// 	.properties = BIODYN_PROP_READ,
+	// 	// TODO: Implement packed planar accel read
+	// 	// .get_data = ,
+	// },
+	// {
+	// 	.name = "Packed Gyro Accel Data",
+	// 	.uuid = BIODYN_BLE_UUID_16(0x4151),
+	// 	.permissions = BIODYN_PERM_READ,
+	// 	.properties = BIODYN_PROP_READ,
+	// 	// TODO: Implement packed gyro accel read
+	// 	// .get_data = ,
+	// },
+	// {
+	// 	.name = "Packed Magnetometer Data",
+	// 	.uuid = BIODYN_BLE_UUID_16(0x4152),
+	// 	.permissions = BIODYN_PERM_READ,
+	// 	.properties = BIODYN_PROP_READ,
+	// 	// TODO: Implement packed magnetometer read
+	// 	// .get_data = ,
+	// },
 	{
 		.name = "Packed IMU Data",
 		.uuid = BIODYN_BLE_UUID_16(0x4153),
@@ -37,22 +37,22 @@ const static struct biodyn_ble_characteristic data_fast_chars[] = {
 		// TODO: Implement packed imu read
 		// .get_data = ,
 	},
-	{
-		.name = "Packed EMG Value Data",
-		.uuid = BIODYN_BLE_UUID_16(0x4154),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		// TODO: Implement packed emg value read
-		// .get_data = ,
-	},
-	{
-		.name = "Packed 10ms EMG Average Data",
-		.uuid = BIODYN_BLE_UUID_16(0x4155),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		// TODO: Implement packed emg 10ms average read
-		// .get_data = ,
-	},
+	// {
+	// 	.name = "Packed EMG Value Data",
+	// 	.uuid = BIODYN_BLE_UUID_16(0x4154),
+	// 	.permissions = BIODYN_PERM_READ,
+	// 	.properties = BIODYN_PROP_READ,
+	// 	// TODO: Implement packed emg value read
+	// 	// .get_data = ,
+	// },
+	// {
+	// 	.name = "Packed 10ms EMG Average Data",
+	// 	.uuid = BIODYN_BLE_UUID_16(0x4155),
+	// 	.permissions = BIODYN_PERM_READ,
+	// 	.properties = BIODYN_PROP_READ,
+	// 	// TODO: Implement packed emg 10ms average read
+	// 	// .get_data = ,
+	// },
 	{
 		.name = "Packed Collective Data",
 		.uuid = BIODYN_BLE_UUID_16(0x4160),

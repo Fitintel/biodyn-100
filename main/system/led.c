@@ -5,13 +5,14 @@
 #include "driver/gpio.h"
 #include <string.h>
 
-#define LED_PIN GPIO_NUM_7
+#define LED_PIN GPIO_NUM_48
 
 static struct
 {
 	bool led_error;
+	bool state;
 	const char *led_error_msg;
-} led_data = {false, "Ok"};
+} led_data = {false, false, "Ok"};
 
 void set_led_error(const char *msg)
 {
@@ -64,6 +65,7 @@ void led_set_state(uint16_t size, void *src)
 				set_led_error("Failed to turn on");
 				return;
 			}
+			led_data.state = true;
 			ESP_LOGI("LED", "Turned on");
 		}
 		else
@@ -74,6 +76,7 @@ void led_set_state(uint16_t size, void *src)
 				set_led_error("Failed to turn off");
 				return;
 			}
+			led_data.state = false;
 			ESP_LOGI("LED", "Turned off");
 		}
 	}
@@ -81,7 +84,7 @@ void led_set_state(uint16_t size, void *src)
 
 void led_get_state(uint16_t *len, void *dst)
 {
-	uint8_t state = gpio_get_level(LED_PIN);
+	uint8_t state = led_data.state;
 	*len = sizeof(state);
 	memcpy(dst, &state, *len);
 	ESP_LOGI("LED", "Read state as %s", state ? "on" : "off");

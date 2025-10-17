@@ -42,16 +42,16 @@ static struct biodyn_ble_profile profiles[] = {
 		.n_services = LEN_OF_STATIC_ARRAY(validation_profile_services),
 		.services = &validation_profile_services[0],
 	},
-	{
-		.name = "Sensor Profile",
-		.n_services = LEN_OF_STATIC_ARRAY(sensor_profile_services),
-		.services = &sensor_profile_services[0],
-	},
-	{
-		.name = "Streaming Profile",
-		.n_services = LEN_OF_STATIC_ARRAY(streaming_profile_services),
-		.services = &streaming_profile_services[0],
-	}
+	// {
+	// 	.name = "Sensor Profile",
+	// 	.n_services = LEN_OF_STATIC_ARRAY(sensor_profile_services),
+	// 	.services = &sensor_profile_services[0],
+	// },
+	// {
+	// 	.name = "Streaming Profile",
+	// 	.n_services = LEN_OF_STATIC_ARRAY(streaming_profile_services),
+	// 	.services = &streaming_profile_services[0],
+	// }
 };
 
 #endif // BIODYN_BLE_PROFILES_H

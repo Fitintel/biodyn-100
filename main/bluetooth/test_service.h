@@ -7,16 +7,6 @@
 #include "imu/imu_icm20948_driver.h"
 #include "string.h"
 
-void imu_icm20948_get_state(uint16_t *len, void *dst)
-{
-	imu_motion_data data = {0};
-	biodyn_imu_icm20948_read_accel_gyro_mag(&data);
-	*len = sizeof(imu_motion_data);
-	// Since imu_motion_data is a struct solely of floats, it can (allegedly) be directly copied for output
-	memcpy(dst, &data, *len);
-	// copying from address of imu data for its length (len)
-}
-
 const static struct biodyn_ble_characteristic sensor_test_chars[] = {
 	{
 		.name = "LED Control",
@@ -26,13 +16,7 @@ const static struct biodyn_ble_characteristic sensor_test_chars[] = {
 		.set_data = led_set_state,
 		.get_data = led_get_state,
 	},
-	{
-		.name = "IMU Control",
-		.uuid = BIODYN_BLE_UUID_16(0x1236),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		.get_data = imu_icm20948_get_state,
-	}};
+};
 
 const static struct biodyn_ble_service test_service = {
 	.name = "Test Sensor Service",

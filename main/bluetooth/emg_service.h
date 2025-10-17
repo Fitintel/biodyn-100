@@ -13,30 +13,30 @@ const static struct biodyn_ble_characteristic emg_service_chars[] = {
 		// TODO: Implement data fetching for emg value char 
 		// .get_data = 
 	},
-	{
-		.name = "EMG 10ms Average",
-		.uuid = BIODYN_BLE_UUID_16(0xB151),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		// TODO: Implement data fetching for emg 10ms average 
-		// .get_data = 
-	},
-	{
-		.name = "EMG 100ms Average",
-		.uuid = BIODYN_BLE_UUID_16(0xB152),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		// TODO: Implement data fetching for emg 100ms average 
-		// .get_data = 
-	},
-	{
-		.name = "EMG 1000ms Average",
-		.uuid = BIODYN_BLE_UUID_16(0xB153),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		// TODO: Implement data fetching for emg 1000ms average 
-		// .get_data = 
-	},
+	// {
+	// 	.name = "EMG 10ms Average",
+	// 	.uuid = BIODYN_BLE_UUID_16(0xB151),
+	// 	.permissions = BIODYN_PERM_READ,
+	// 	.properties = BIODYN_PROP_READ,
+	// 	// TODO: Implement data fetching for emg 10ms average 
+	// 	// .get_data = 
+	// },
+	// {
+	// 	.name = "EMG 100ms Average",
+	// 	.uuid = BIODYN_BLE_UUID_16(0xB152),
+	// 	.permissions = BIODYN_PERM_READ,
+	// 	.properties = BIODYN_PROP_READ,
+	// 	// TODO: Implement data fetching for emg 100ms average 
+	// 	// .get_data = 
+	// },
+	// {
+	// 	.name = "EMG 1000ms Average",
+	// 	.uuid = BIODYN_BLE_UUID_16(0xB153),
+	// 	.permissions = BIODYN_PERM_READ,
+	// 	.properties = BIODYN_PROP_READ,
+	// 	// TODO: Implement data fetching for emg 1000ms average 
+	// 	// .get_data = 
+	// },
 };
 
 const static struct biodyn_ble_service emg_service = {

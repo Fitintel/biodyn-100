@@ -50,6 +50,7 @@ esp_err_t biodyn_self_test_init()
 // Bluetooth callback
 void self_test_set_state(uint16_t size, void *src)
 {
+	ESP_LOGI(ST_TAG, "Set self-test state called");
 	self_test_state *in_state = (self_test_state *)src;
 	switch (*in_state)
 	{
@@ -107,13 +108,14 @@ void self_test_start()
 
 	// All good
 	self_test_data.state = completed_ok;
+
 	ESP_LOGI(ST_TAG, "All systems passed self-test");
 }
 
 // Bluetooth callback
 void self_test_get_state(uint16_t *len, void *dst)
 {
-	uint8_t state = self_test_data.state;
+	uint32_t state = self_test_data.state;
 	*len = sizeof(state);
 	memcpy(dst, &state, *len);
 	ESP_LOGI(ST_TAG, "Read state as %s", get_state_string(self_test_data.state));
