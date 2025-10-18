@@ -253,7 +253,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 
 	// Serial interface in SPI mode only
 	uint8_t user_ctrl_data;
-	err |= biodyn_imu_icm20948_eead_reg(_b0, USER_CTRL, &user_ctrl_data);
+	err |= biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
 	user_ctrl_data |= 0x10;
 	err |= biodyn_imu_icm20948_write_reg(_b2, USER_CTRL, user_ctrl_data);
 
@@ -770,16 +770,17 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
 
 	// Byte shifting for full high and low register with proper endianness
-	int16_t raw_ax = (int16_t)((out[0] << 8) | out[1]);
-	int16_t raw_ay = (int16_t)((out[2] << 8) | out[3]);
-	int16_t raw_az = (int16_t)((out[4] << 8) | out[5]);
-	int16_t raw_gx = (int16_t)((out[6] << 8) | out[7]);
-	int16_t raw_gy = (int16_t)((out[8] << 8) | out[9]);
-	int16_t raw_gz = (int16_t)((out[10] << 8) | out[11]);
+	int16_t raw_ax = ((uint16_t) out[0] << 8) | out[1];
+	int16_t raw_ay = ((uint16_t) out[2] << 8) | out[3];
+	int16_t raw_az = ((uint16_t) out[4] << 8) | out[5];
+	int16_t raw_gx = ((uint16_t) out[6] << 8) | out[7];
+	int16_t raw_gy = ((uint16_t) out[8] << 8) | out[9];
+	int16_t raw_gz = ((uint16_t) out[10] << 8) | out[11];
 	// gap of two bytes between accel + gyro and mag for temperature registers
-	int16_t raw_mx = (int16_t)((out[15] << 8) | out[14]);
-	int16_t raw_my = (int16_t)((out[17] << 8) | out[16]);
-	int16_t raw_mz = (int16_t)((out[19] << 8) | out[18]);
+	int16_t raw_mx = ((uint16_t) out[15] << 8) | out[14];
+	int16_t raw_my = ((uint16_t) out[17] << 8) | out[16];
+	int16_t raw_mz = ((uint16_t) out[19] << 8) | out[18];
+	// ESP_LOGI("TAG", "Raw Accel: %d, %d, %d", raw_ax, raw_ay, raw_az);
 
 	data->accel_x = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
 	data->accel_y = ((float)raw_ay / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
@@ -793,7 +794,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	data->gyro_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
 	data->gyro_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
 
-	ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
+	// ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
 	free(out);
 	return BIODYN_IMU_OK;
 }
