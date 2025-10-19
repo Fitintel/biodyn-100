@@ -734,11 +734,24 @@ void biodyn_imu_icm20948_read_accel(uint16_t *size, void *out)
  */
 void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out)
 {
-	// ASSUMES imu_motion_data has gyro xyz in that order
-	imu_motion_data imd = {0};
-	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
-	memcpy(out, &(imd.gyro_x), sizeof(float) * 3);
-	*size = sizeof(float) * 3;
+	uint8_t read_out_length = 6;
+	uint8_t *read_out = malloc(sizeof(uint8_t) * read_out_length);
+
+	biodyn_imu_icm20948_multibyte_read_reg(_b0, GYRO_XOUT_H, read_out, read_out_length);
+
+	// Byte shifting for full high and low register with proper endianness
+	int16_t raw_ax = (int16_t)((read_out[0] << 8) | read_out[1]);
+	int16_t raw_ay = (int16_t)((read_out[2] << 8) | read_out[3]);
+	int16_t raw_az = (int16_t)((read_out[4] << 8) | read_out[5]);
+
+	float *fout = (float *)out;
+	*size = 3 * sizeof(float);
+	fout[0] = ((float)raw_ax / gyro_sensitivity_scale_factor);
+	fout[1] = ((float)raw_ay / gyro_sensitivity_scale_factor);
+	fout[2] = ((float)raw_az / gyro_sensitivity_scale_factor);
+
+	// ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
+	free(read_out);
 }
 
 /**
@@ -751,11 +764,24 @@ void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out)
  */
 void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out)
 {
-	// ASSUMES imu_motion_data has mag xyz in that order
-	imu_motion_data imd = {0};
-	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
-	memcpy(out, &(imd.mag_x), sizeof(float) * 3);
-	*size = sizeof(float) * 3;
+	uint8_t read_out_length = 6;
+	uint8_t *read_out = malloc(sizeof(uint8_t) * read_out_length);
+
+	biodyn_imu_icm20948_multibyte_read_reg(_b0, MAG_XOUT_H, read_out, read_out_length);
+
+	// Byte shifting for full high and low register with proper endianness
+	int16_t raw_ax = (int16_t)((read_out[0] << 8) | read_out[1]);
+	int16_t raw_ay = (int16_t)((read_out[2] << 8) | read_out[3]);
+	int16_t raw_az = (int16_t)((read_out[4] << 8) | read_out[5]);
+
+	float *fout = (float *)out;
+	*size = 3 * sizeof(float);
+	fout[0] = ((float)raw_ax / gyro_sensitivity_scale_factor);
+	fout[1] = ((float)raw_ay / gyro_sensitivity_scale_factor);
+	fout[2] = ((float)raw_az / gyro_sensitivity_scale_factor);
+
+	// ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
+	free(read_out);
 }
 
 // TODO FIX: check if out poitner is being given data properly, write into its memeory rather than reassign pointer
