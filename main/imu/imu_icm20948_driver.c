@@ -697,14 +697,38 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
  * Returns the converted, scaled, and signed output that is then converted into a binary stream for external (pointer)
  * @param size the amount of bytes to be read from out
  * @param out the output data from the IMU read of the accelerometer registers
+ * out must already have space greater than (sizeof(float) * 3)
+ * FYI sizeof(float) = 32 (bits). Therefore, 32 * 3 = 96
  */
-void biodyn_imu_icm20948_read_accel(uint16_t *size, void *out);
+void biodyn_imu_icm20948_read_accel(uint16_t *size, void *out)
+{
+	uint8_t read_out_length = 6;
+	uint8_t *read_out = malloc(sizeof(uint8_t) * read_out_length);
+
+	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, read_out, read_out_length);
+
+	// Byte shifting for full high and low register with proper endianness
+	int16_t raw_ax = (int16_t)((read_out[0] << 8) | read_out[1]);
+	int16_t raw_ay = (int16_t)((read_out[2] << 8) | read_out[3]);
+	int16_t raw_az = (int16_t)((read_out[4] << 8) | read_out[5]);
+
+	float *fout = (float *)out;
+	*size = 3 * sizeof(float);
+	fout[0] = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
+	fout[1] = ((float)raw_ay / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
+	fout[2] = ((float)raw_az / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
+
+	// ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
+	free(read_out);
+}
 
 /**
  * Reads the gyroscope data of the IMU with bluetooth compatability
  * Returns the converted, scaled, and signed output that is then converted into a binary stream for external (pointer)
  * @param size the amount of bytes to be read from out
  * @param out the output data from the IMU read of the gyroscope registers
+ * out must already have space greater than (sizeof(float) * 3)
+ * FYI sizeof(float) = 32 (bits). Therefore, 32 * 3 = 96
  */
 void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out);
 
@@ -713,6 +737,8 @@ void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out);
  * Returns the converted, scaled, and signed output that is then converted into a binary stream for external (pointer)
  * @param size the amount of bytes to be read from out
  * @param out the output data from the IMU read of the magnetometer registers
+ * out must already have space greater than (sizeof(float) * 3)
+ * FYI sizeof(float) = 32 (bits). Therefore, 32 * 3 = 96
  */
 void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out);
 
@@ -734,11 +760,14 @@ static uint8_t *serialize_imu_data(const imu_motion_data *data, size_t *out_size
 	return buffer;
 }
 
+// TODO FIX: check if out poitner is being given data properly, write into its memeory rather than reassign pointer
 /**
  * Reads the accelerometer, gyroscope, and magnetometer data of the IMU with bluetooth compatability
  * Returns the converted, scaled, and signed output that is then converted into a binary stream for external (pointer)
  * @param size the amount of bytes to be read from out
  * @param out the output data from the IMU of all relevant registers
+ * Out should already have sufficient memory space for the data (sizeof(float) * 9)
+ * FYI sizeof(float) = 32 (bits). Therefore, 32 * 9 = 288
  */
 void biodyn_imu_icm20948_read_all(uint16_t *size, void *out)
 {
@@ -758,7 +787,7 @@ void biodyn_imu_icm20948_read_all(uint16_t *size, void *out)
  */
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 {
-	uint8_t out_length = 18;
+	uint8_t out_length = 20;
 	uint8_t *out = malloc(sizeof(uint8_t) * out_length);
 
 	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
@@ -787,7 +816,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	data->gyro_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
 	data->gyro_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
 
-	ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
+	// ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
 	free(out);
 	return BIODYN_IMU_OK;
 }
