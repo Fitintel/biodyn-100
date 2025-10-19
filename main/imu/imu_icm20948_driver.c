@@ -784,7 +784,6 @@ void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out)
 	free(read_out);
 }
 
-// TODO FIX: check if out poitner is being given data properly, write into its memeory rather than reassign pointer
 /**
  * Reads the accelerometer, gyroscope, and magnetometer data of the IMU with bluetooth compatability
  * Returns the converted, scaled, and signed output that is then converted into a binary stream for external (pointer)
