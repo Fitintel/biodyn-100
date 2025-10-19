@@ -764,7 +764,7 @@ void biodyn_imu_icm20948_read_all(uint16_t *size, void *out)
  */
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 {
-	uint8_t out_length = 18;
+	uint8_t out_length = 9 * sizeof(uint16_t) + 2 * sizeof(uint8_t);
 	uint8_t *out = malloc(sizeof(uint8_t) * out_length);
 
 	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
