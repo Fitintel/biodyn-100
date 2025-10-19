@@ -12,7 +12,7 @@
 static uint8_t accel_range_value = _accel_2g;
 static uint8_t gyro_range_value = _gyro_1000dps;
 
-static uint8_t accel_sensitivity_scale_factor = 0;
+static uint16_t accel_sensitivity_scale_factor = 0;
 static float gyro_sensitivity_scale_factor = -1;
 
 // TODO reorganize with config
@@ -207,8 +207,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// INITIALIZATION PROCEDURE
 
 	// Initialize configuration data
-	accel_sensitivity_scale_factor = (1 << (14 - accel_range_value));
+	accel_sensitivity_scale_factor = (1 << (uint16_t)(14 - accel_range_value));
 	gyro_sensitivity_scale_factor = 16.4 * (1 << (3 - gyro_range_value));
+	ESP_LOGI(TAG, "\tPlanar sensitivity factor: %d", accel_sensitivity_scale_factor);
+	ESP_LOGI(TAG, "\tGyro sensitivity factor: %f", gyro_sensitivity_scale_factor);
 
 	// Reset IMU
 	// Start error collection,
@@ -730,7 +732,14 @@ void biodyn_imu_icm20948_read_accel(uint16_t *size, void *out)
  * out must already have space greater than (sizeof(float) * 3)
  * FYI sizeof(float) = 32 (bits). Therefore, 32 * 3 = 96
  */
-void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out);
+void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out)
+{
+	// ASSUMES imu_motion_data has gyro xyz in that order
+	imu_motion_data imd = {0};
+	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
+	memcpy(out, &(imd.gyro_x), sizeof(float) * 3);
+	*size = sizeof(float) * 3;
+}
 
 /**
  * Reads the magnetometer data of the IMU with bluetooth compatability
@@ -740,24 +749,13 @@ void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out);
  * out must already have space greater than (sizeof(float) * 3)
  * FYI sizeof(float) = 32 (bits). Therefore, 32 * 3 = 96
  */
-void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out);
-
-/**
- * Simple serializer for imu motion data into readable byte stream
- */
-static uint8_t *serialize_imu_data(const imu_motion_data *data, size_t *out_size)
+void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out)
 {
-	*out_size = sizeof(imu_motion_data);
-	uint8_t *buffer = (uint8_t *)malloc(*out_size);
-	if (buffer == NULL)
-	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "IMU_SERIALIZE: could not allocate memory for buffer");
-		*out_size = 0;
-		return NULL; // Handle allocation failure
-	}
-
-	memcpy(buffer, data, *out_size);
-	return buffer;
+	// ASSUMES imu_motion_data has mag xyz in that order
+	imu_motion_data imd = {0};
+	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
+	memcpy(out, &(imd.mag_x), sizeof(float) * 3);
+	*size = sizeof(float) * 3;
 }
 
 // TODO FIX: check if out poitner is being given data properly, write into its memeory rather than reassign pointer
@@ -773,7 +771,8 @@ void biodyn_imu_icm20948_read_all(uint16_t *size, void *out)
 {
 	imu_motion_data imd = {0};
 	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
-	out = serialize_imu_data(&imd, size);
+	memcpy(out, &imd, sizeof(imu_motion_data));
+	*size = sizeof(imu_motion_data);
 }
 
 // -----------------------------BLUETOOTH HANDLE FUNCTIONS-----------------------------
@@ -787,22 +786,24 @@ void biodyn_imu_icm20948_read_all(uint16_t *size, void *out)
  */
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 {
-	uint8_t out_length = 20;
+
+	uint8_t out_length = 9 * sizeof(uint16_t) + 2 * sizeof(uint8_t);
 	uint8_t *out = malloc(sizeof(uint8_t) * out_length);
 
 	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
 
 	// Byte shifting for full high and low register with proper endianness
-	int16_t raw_ax = (int16_t)((out[0] << 8) | out[1]);
-	int16_t raw_ay = (int16_t)((out[2] << 8) | out[3]);
-	int16_t raw_az = (int16_t)((out[4] << 8) | out[5]);
-	int16_t raw_gx = (int16_t)((out[6] << 8) | out[7]);
-	int16_t raw_gy = (int16_t)((out[8] << 8) | out[9]);
-	int16_t raw_gz = (int16_t)((out[10] << 8) | out[11]);
+	int16_t raw_ax = ((uint16_t)out[0] << 8) | out[1];
+	int16_t raw_ay = ((uint16_t)out[2] << 8) | out[3];
+	int16_t raw_az = ((uint16_t)out[4] << 8) | out[5];
+	int16_t raw_gx = ((uint16_t)out[6] << 8) | out[7];
+	int16_t raw_gy = ((uint16_t)out[8] << 8) | out[9];
+	int16_t raw_gz = ((uint16_t)out[10] << 8) | out[11];
 	// gap of two bytes between accel + gyro and mag for temperature registers
-	int16_t raw_mx = (int16_t)((out[15] << 8) | out[14]);
-	int16_t raw_my = (int16_t)((out[17] << 8) | out[16]);
-	int16_t raw_mz = (int16_t)((out[19] << 8) | out[18]);
+	int16_t raw_mx = ((uint16_t)out[15] << 8) | out[14];
+	int16_t raw_my = ((uint16_t)out[17] << 8) | out[16];
+	int16_t raw_mz = ((uint16_t)out[19] << 8) | out[18];
+	// ESP_LOGI("TAG", "Raw Accel: %d, %d, %d", raw_ax, raw_ay, raw_az);
 
 	data->accel_x = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
 	data->accel_y = ((float)raw_ay / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
