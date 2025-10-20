@@ -3,6 +3,7 @@
 
 #include "constants.h"
 #include "bluetooth/ble.h"
+#include "imu/data_fast.h"
 
 const static struct biodyn_ble_characteristic data_fast_chars[] = {
 	// {
@@ -34,8 +35,7 @@ const static struct biodyn_ble_characteristic data_fast_chars[] = {
 		.uuid = BIODYN_BLE_UUID_16(0x4153),
 		.permissions = BIODYN_PERM_READ,
 		.properties = BIODYN_PROP_READ,
-		// TODO: Implement packed imu read
-		// .get_data = ,
+		.get_data = ble_data_fast_packed_imu,
 	},
 	// {
 	// 	.name = "Packed EMG Value Data",

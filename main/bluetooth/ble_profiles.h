@@ -22,7 +22,7 @@ const static struct biodyn_ble_service validation_profile_services[] = {
 
 const static struct biodyn_ble_service sensor_profile_services[] = {
 	imu_service,
-	emg_service,
+	// emg_service,
 };
 
 const static struct biodyn_ble_service streaming_profile_services[] = {
@@ -47,11 +47,11 @@ static struct biodyn_ble_profile profiles[] = {
 		.n_services = LEN_OF_STATIC_ARRAY(sensor_profile_services),
 		.services = &sensor_profile_services[0],
 	},
-	// {
-	// 	.name = "Streaming Profile",
-	// 	.n_services = LEN_OF_STATIC_ARRAY(streaming_profile_services),
-	// 	.services = &streaming_profile_services[0],
-	// }
+	{
+		.name = "Streaming Profile",
+		.n_services = LEN_OF_STATIC_ARRAY(streaming_profile_services),
+		.services = &streaming_profile_services[0],
+	}
 };
 
 #endif // BIODYN_BLE_PROFILES_H

@@ -22,22 +22,22 @@ const static struct biodyn_ble_characteristic imu_service_chars[] = {
 		// TODO: Implement data fetching for gyro velocity char
 		.get_data = biodyn_imu_icm20948_read_gyro,
 	},
-	{
-		.name = "Magnetometer",
-		.uuid = BIODYN_BLE_UUID_16(0xC352),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		// TODO: Implement data fetching for magnetometer char
-		.get_data = biodyn_imu_icm20948_read_mag,
-	},
-	{
-		.name = "All IMU Data",
-		.uuid = BIODYN_BLE_UUID_16(0xC353),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		// TODO: Implement POTENTIAL data fetching for all imu data chars
-		.get_data = biodyn_imu_icm20948_read_all,
-	}
+	// {
+	// 	.name = "Magnetometer",
+	// 	.uuid = BIODYN_BLE_UUID_16(0xC352),
+	// 	.permissions = BIODYN_PERM_READ,
+	// 	.properties = BIODYN_PROP_READ,
+	// 	// TODO: Implement data fetching for magnetometer char
+	// 	.get_data = biodyn_imu_icm20948_read_mag,
+	// },
+	// {
+	// 	.name = "All IMU Data",
+	// 	.uuid = BIODYN_BLE_UUID_16(0xC353),
+	// 	.permissions = BIODYN_PERM_READ,
+	// 	.properties = BIODYN_PROP_READ,
+	// 	// TODO: Implement POTENTIAL data fetching for all imu data chars
+	// 	.get_data = biodyn_imu_icm20948_read_all,
+	// }
 	// TODO add config characteristics for IMU
 };
 

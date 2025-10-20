@@ -19,6 +19,7 @@
 #include "bluetooth/ble.h"
 #include "bluetooth/ble_profiles.h"
 #include "biodyn_systems.h"
+#include "imu/data_fast.h"
 
 void test_accel_imu_icm20948();
 void test_all_registers_imu_icm20948();
@@ -68,6 +69,10 @@ void app_main(void)
 	// 	test_all_registers_imu_icm20948();
 	// 	test_accel_imu_icm20948();
 	// 	test_accel_gyro_imu_icm20948();
+	for(;;) {
+		vTaskDelay(pdMS_TO_TICKS(15));
+		data_fast_read();
+	}
 }
 
 void test_imu_icm20948()

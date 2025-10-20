@@ -283,7 +283,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	}
 
 	// Initialize magnetometer
-	err |= biodyn_imu_icm20948_init_magnetomter();
+	// err |= biodyn_imu_icm20948_init_magnetomter();
 
 	// Read the magnetometer data from HXL to HZH
 	// i.e., the values of the magnetometer for x,y,z seperated into 2 bytes each
@@ -310,7 +310,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// Initialize the magnetometer
 
 	// Successful init, all clear
+	uint8_t out;
+	biodyn_imu_icm20948_read_register_test(_b0, USER_CTRL, &out);
+	ESP_LOGI(TAG, "IMU USER_CTRL register: %x", out);
+
 	ESP_LOGI(TAG, "Initialized IMU");
+
 	return BIODYN_IMU_OK;
 }
 
@@ -685,10 +690,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	}
 
 	// Run mag self-test
-	if ((err = self_test_mag()))
-	{
-		ESP_LOGE(TAG, "Self test failed - mag (%x)", err);
-	}
+	// if ((err = self_test_mag()))
+	// {
+	// 	ESP_LOGE(TAG, "Self test failed - mag (%x)", err);
+	// }
 
 	return BIODYN_IMU_OK;
 }
