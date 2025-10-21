@@ -2,7 +2,7 @@
 #include "imu/imu_icm20948_driver.h"
 #include "string.h"
 
-#define IMU_DATA_CNT 10
+#define IMU_DATA_CNT 13
 
 static struct
 {
@@ -26,7 +26,7 @@ void ble_data_fast_packed_imu(uint16_t *size, void *out)
 	int current_size = data_fast.data_ptr;
 	int old_size = data_fast.data_cnt - data_fast.data_ptr;
 	imu_motion_data *p = data_fast.data;
-	memcpy(out + old_size, p, current_size * sizeof(imu_motion_data));
+	memcpy(out + (old_size * sizeof(imu_motion_data)), p, current_size * sizeof(imu_motion_data));
 	memcpy(out, p, old_size * sizeof(imu_motion_data));
 	*size = IMU_DATA_CNT * sizeof(imu_motion_data);
 }
