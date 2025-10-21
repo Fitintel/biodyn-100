@@ -70,7 +70,7 @@ void app_main(void)
 	// 	test_accel_imu_icm20948();
 	// 	test_accel_gyro_imu_icm20948();
 	for(;;) {
-		vTaskDelay(pdMS_TO_TICKS(5));
+		vTaskDelay(pdMS_TO_TICKS(15));
 		data_fast_read();
 	}
 }
