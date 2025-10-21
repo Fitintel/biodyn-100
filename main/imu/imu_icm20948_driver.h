@@ -142,13 +142,54 @@ biodyn_imu_err_t biodyn_imu_icm20948_config_accel(uint8_t accel_dlpfcfg, uint8_t
 
 /**
  * Configures the number of samples averaged in the accelerometer decimator
- * @param dec3_cfg sets the number of samples by the table below:
+ * @param dec3_cfg takes a number [0b00, 0b11] and sets the number of samples by the table below:
  * | 00: 1 sample (or 4 samples if fchoice is enabled)
  * | 01: 8 samples
  * | 10: 16 samples
  * | 11: 32 samples
  */
-biodyn_imu_err_t biodyn_imu_icm20948_config_accel_sample_averaging(uint8_t dec3_cfg);
+biodyn_imu_err_t biodyn_imu_icm20948_config_accel_number_samples_averaged(uint8_t dec3_cfg);
+
+/**
+ * Configures the ODR_ALIGN_EN (i.e., whether all sensors are sampled together or sampled disjointly, but not exclusively)
+ * These sensors include the accelerometer, gyroscope, magnetometer, and ambient temperature sensors.
+ * @param enabled The enabled status of ODR_ALIGN_EN (1 = true: sensors are aligned, 0 = false: sensors are not aligned)
+ * NOTICE: ODR alignment only begins (if enabled) when a sample rate is provided, when one of the following registers is written to:
+ * 	GYRO_SMPLRT_DIV,
+ *	ACCEL_SMPLRT_DIV_1,
+ * 	ACCEL_SMPLRT_DIV_2,
+ * 	I2C_MST_ODR_CONFIG.
+ */
+biodyn_imu_err_t biodyn_imu_icm20948_config_odr_align_en(bool enabled);
+
+/**
+ * Configures the rate at which samples are taken by the accelerometer
+ * @param accel_smplrt_div takes a number [0, 2^12-1] that is the sample rate divider that decides the sampling rate as per the formula below:
+ * Accel sampling rate = 1.125 kHz/(1+ACCEL_SMPLRT_DIV[11:0])
+ * All erroneous bits will be masked out.
+ * NOTICE: setting a new sample rate while ODR_ALIGN_EN is enabled will set all sensors to the same sampling rate.
+ * Disable ODR_ALIGN_EN if this is not the intented result.
+ */
+biodyn_imu_err_t biodyn_imu_icm20948_config_accel_sample_rate(uint16_t accel_smplrt_div);
+
+/**
+ * Configures the rate at which samples are taken by the gyroscope.
+ * @param gyro_smplrt_div takes a number [0, 2^8-1] that is the sample rate divider that decides the sampling rate as per the formula below:
+ * Gyro sampling rate = 1.1 kHz/(1+GYRO_SMPLRT_DIV[7:0])
+ * NOTICE: setting a new sample rate while ODR_ALIGN_EN is enabled will set all sensors to the same sampling rate.
+ * Disable ODR_ALIGN_EN if this is not the intented result.
+ */
+biodyn_imu_err_t biodyn_imu_icm20948_config_gyro_sample_averaging(uint8_t gyro_smplrt_div);
+
+/**
+ * Configures the rate at which samples are taken by the gyroscope.
+ * @param gyro_smplrt_div takes a number [0, 2^8-1] that is the sample rate divider that decides the sampling rate as per the formula below:
+ * Gyro sampling rate = 1.1 kHz/(1+GYRO_SMPLRT_DIV[7:0])
+ * NOTICE: setting a new sample rate while ODR_ALIGN_EN is enabled will set all sensors to the same sampling rate.
+ * Disable ODR_ALIGN_EN if this is not the intented result.
+ */
+biodyn_imu_err_t biodyn_imu_icm20948_config_gyro_sample_averaging(uint8_t gyro_smplrt_div);
+
 // TODO rest of functions for configuring IMU
 
 #endif // ICM20948_DRIVER_H

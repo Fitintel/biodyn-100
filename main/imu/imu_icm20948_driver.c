@@ -776,9 +776,12 @@ void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out)
 
 	float *fout = (float *)out;
 	*size = 3 * sizeof(float);
-	fout[0] = ((float)raw_ax / gyro_sensitivity_scale_factor);
-	fout[1] = ((float)raw_ay / gyro_sensitivity_scale_factor);
-	fout[2] = ((float)raw_az / gyro_sensitivity_scale_factor);
+	fout[0] = ((float)raw_ax * MAG_SENSITIVITY_SCALE_FACTOR);
+	fout[1] = ((float)raw_ay * MAG_SENSITIVITY_SCALE_FACTOR);
+	fout[2] = ((float)raw_az * MAG_SENSITIVITY_SCALE_FACTOR);
+
+	// TEST: read status2 register of magnetometer as required in p. 79 after each measurement
+	biodyn_imu_ak09916_read_reg(AK09916_STATUS2, 1);
 
 	// ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
 	free(read_out);
@@ -842,7 +845,9 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	data->gyro_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
 	data->gyro_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
 
-	// ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
+	// TEST: read status2 register of magnetometer as required in p. 79 after each measurement
+	biodyn_imu_ak09916_read_reg(AK09916_STATUS2, 1);
+
 	free(out);
 	return BIODYN_IMU_OK;
 }
