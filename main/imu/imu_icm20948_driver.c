@@ -575,22 +575,84 @@ static biodyn_imu_err_t self_test_user_banks()
 	return BIODYN_IMU_OK;
 }
 
-// TODO: this doesn't look like a proper self-test, check it out?
+// BETTER IDEA: SELF_TEST TOGETHER (SAME MECHANISMS FOR BOTH)?
+
+static biodyn_imu_err_t self_test_accel_gyro()
+{
+	// SELF-TEST RESPONSE = SENSOR OUTPUT WITH SELF-TEST ENABLED – SENSOR OUTPUT WITHOUT SELF-TEST ENABLED (p. 24)
+	// Sensor output without self_test_enabled
+	imu_motion_data imd_st_off = {0};
+	imu_motion_data imd_st_on = {0};
+
+	biodyn_imu_icm20948_read_accel_gyro_mag(&imd_st_off);
+
+	// Start self_test actualizers
+	// Use accel_config2 and gyro_config2
+
+	// ACCEL SELF_TEST START
+	uint8_t temp = 0;
+	biodyn_imu_icm20948_read_reg(_b2, ACCEL_CONFIG_2, &temp);
+	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
+	temp |= (0b111 << 5);
+	biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG_2, temp);
+
+	// GYRO SELF_TEST START
+	temp = 0;
+	biodyn_imu_icm20948_read_reg(_b2, GYRO_CONFIG_2, &temp);
+	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
+	temp |= (0b111 << 5);
+	biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_2, temp);
+	vtaskDelay(pdMS_TO_TICKS(50));
+
+	// Sensor output with self_test_enabled
+	biodyn_imu_icm20948_read_accel_gyro_mag(&imd_st_on);
+
+	// Subtract sensor ouput st_off froms st_on
+	imu_motion_data deltas = {0};
+	deltas.accel_x = imd_st_on.accel_x - imd_st_off.accel_x;
+	deltas.accel_y = imd_st_on.accel_y - imd_st_off.accel_y;
+	deltas.accel_z = imd_st_on.accel_z - imd_st_off.accel_z;
+	deltas.gyro_x = imd_st_on.gyro_x - imd_st_off.gyro_x;
+	deltas.gyro_y = imd_st_on.gyro_y - imd_st_off.gyro_y;
+	deltas.gyro_z = imd_st_on.gyro_z - imd_st_off.gyro_z;
+
+	// Obtain factory self_test results from icm20948 self_test registers to compare to.
+
+	// Clear self_test bits
+	// ACCEL SELF_TEST END
+	uint8_t temp = 0;
+	biodyn_imu_icm20948_read_reg(_b2, ACCEL_CONFIG_2, &temp);
+	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
+	temp &= ~(0b111 << 5);
+	biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG_2, temp);
+
+	// GYRO SELF_TEST END
+	temp = 0;
+	biodyn_imu_icm20948_read_reg(_b2, GYRO_CONFIG_2, &temp);
+	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
+	temp &= ~(0b111 << 5);
+	biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_2, temp);
+}
+
 // TODO: also check gyro self-test
 static biodyn_imu_err_t self_test_accel()
 {
-	uint8_t low;
-	uint8_t high;
-	int16_t out = 0;
-	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_L, &low);
-	biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_H, &high);
+	// SELF-TEST RESPONSE = SENSOR OUTPUT WITH SELF-TEST ENABLED – SENSOR OUTPUT WITHOUT SELF-TEST ENABLED (p. 24)
+	// Sensor output without self_test_enabled
+	uint8_t st_off_xh = 0;
 
-	out = (((int16_t)high) << 8) | low;
-	out *= (9.81 / 4096);
+	// biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_H, )
 
-	return BIODYN_IMU_OK;
+	// Use accel_config_2 to start self test on all axes
+	uint8_t temp = 0;
+	biodyn_imu_icm20948_read_reg(_b2, ACCEL_CONFIG_2, &temp);
+	// [7:5] reserved, [4:2] xyz self-test enables, [1:0] accel sample decimator (see function ...accel_number_samples_averaged)
+	temp |= 0b00011100;
+	biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG_2, temp);
+	// SELF_TEST ACCEL STARTED
 }
 
+// TODO: Fix this self-test
 /**
  * Self-test the gyroscope of the IMU.
  * Checks the built-in self-test in the IMU, which identifies if it's gyroscope is working.
