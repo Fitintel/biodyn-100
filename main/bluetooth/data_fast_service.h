@@ -4,32 +4,9 @@
 #include "constants.h"
 #include "bluetooth/ble.h"
 #include "imu/data_fast.h"
+#include "system/time_sync.h"
 
 const static struct biodyn_ble_characteristic data_fast_chars[] = {
-	// {
-	// 	.name = "Packed Planar Accel Data",
-	// 	.uuid = BIODYN_BLE_UUID_16(0x4150),
-	// 	.permissions = BIODYN_PERM_READ,
-	// 	.properties = BIODYN_PROP_READ,
-	// 	// TODO: Implement packed planar accel read
-	// 	// .get_data = ,
-	// },
-	// {
-	// 	.name = "Packed Gyro Accel Data",
-	// 	.uuid = BIODYN_BLE_UUID_16(0x4151),
-	// 	.permissions = BIODYN_PERM_READ,
-	// 	.properties = BIODYN_PROP_READ,
-	// 	// TODO: Implement packed gyro accel read
-	// 	// .get_data = ,
-	// },
-	// {
-	// 	.name = "Packed Magnetometer Data",
-	// 	.uuid = BIODYN_BLE_UUID_16(0x4152),
-	// 	.permissions = BIODYN_PERM_READ,
-	// 	.properties = BIODYN_PROP_READ,
-	// 	// TODO: Implement packed magnetometer read
-	// 	// .get_data = ,
-	// },
 	{
 		.name = "Packed IMU Data",
 		.uuid = BIODYN_BLE_UUID_16(0x4153),
@@ -37,29 +14,31 @@ const static struct biodyn_ble_characteristic data_fast_chars[] = {
 		.properties = BIODYN_PROP_READ,
 		.get_data = ble_data_fast_packed_imu,
 	},
-	// {
-	// 	.name = "Packed EMG Value Data",
-	// 	.uuid = BIODYN_BLE_UUID_16(0x4154),
-	// 	.permissions = BIODYN_PERM_READ,
-	// 	.properties = BIODYN_PROP_READ,
-	// 	// TODO: Implement packed emg value read
-	// 	// .get_data = ,
-	// },
-	// {
-	// 	.name = "Packed 10ms EMG Average Data",
-	// 	.uuid = BIODYN_BLE_UUID_16(0x4155),
-	// 	.permissions = BIODYN_PERM_READ,
-	// 	.properties = BIODYN_PROP_READ,
-	// 	// TODO: Implement packed emg 10ms average read
-	// 	// .get_data = ,
-	// },
 	{
 		.name = "Packed Collective Data",
-		.uuid = BIODYN_BLE_UUID_16(0x4160),
+		.uuid = BIODYN_BLE_UUID_16(0x4155),
 		.permissions = BIODYN_PERM_READ,
 		.properties = BIODYN_PROP_READ,
 		// TODO: Implement packed collective data read
 		// .get_data = ,
+	},
+	{
+		.name = "Heartbeat",
+		.uuid = BIODYN_BLE_UUID_16(0x4157),
+		.permissions = BIODYN_PERM_READ_WRITE,
+		.properties = BIODYN_PROP_READ_WRITE,
+		// TODO: Implement time sync hearbeat read/write
+		// .set_data = ,
+		.get_data = ble_time_sync_ticker_read,
+	},
+	{
+		.name = "Round Trip Time",
+		.uuid = BIODYN_BLE_UUID_16(0x4158),
+		.permissions = BIODYN_PERM_READ_WRITE,
+		.properties = BIODYN_PROP_READ_WRITE,
+		// TODO: Implement time sync round trip time (RTT) read/write
+		// .set_data = ,
+		.get_data = ble_time_sync_rtt_read,
 	},
 };
 

@@ -20,6 +20,30 @@ static struct
 	.data_ptr = 0,
 };
 
+esp_err_t biodyn_data_fast_init()
+{
+	return ESP_OK;
+}
+
+esp_err_t biodyn_data_fast_self_test()
+{
+	return ESP_OK;
+}
+
+bool biodyn_data_fast_has_error()
+{
+	return IMU_DATA_CNT * sizeof(timed_read) >= 500;
+}
+
+const char *biodyn_data_fast_get_error()
+{
+	if (IMU_DATA_CNT * sizeof(timed_read) >= 500)
+	{
+		return "Data greater than MTU";
+	}
+	return "No error";
+}
+
 void data_fast_read()
 {
 	uint32_t read_ticker = biodyn_time_sync_get_ticker();
@@ -34,8 +58,8 @@ void ble_data_fast_packed_imu(uint16_t *size, void *out)
 {
 	int current_size = data_fast.data_ptr;
 	int old_size = data_fast.data_cnt - data_fast.data_ptr;
-	imu_motion_data *p = data_fast.data;
-	memcpy(out + (old_size * sizeof(imu_motion_data)), p, current_size * sizeof(imu_motion_data));
-	memcpy(out, p, old_size * sizeof(imu_motion_data));
-	*size = IMU_DATA_CNT * sizeof(imu_motion_data);
+	timed_read *p = &data_fast.data[0];
+	memcpy(out + (old_size * sizeof(timed_read)), p, current_size * sizeof(timed_read));
+	memcpy(out, p, old_size * sizeof(timed_read));
+	*size = IMU_DATA_CNT * sizeof(timed_read);
 }

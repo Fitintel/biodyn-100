@@ -12,7 +12,9 @@ esp_err_t biodyn_time_sync_self_test();
 bool time_sync_has_error();
 const char *time_sync_get_error();
 
+// BLE callbacks
 void ble_time_sync_ticker_read(uint16_t *size, void *out);
+void ble_time_sync_rtt_read(uint16_t *size, void *out);
 
 const static biodyn_system biodyn_time_sync_system = {
 	.name = "Time Sync",
@@ -21,7 +23,6 @@ const static biodyn_system biodyn_time_sync_system = {
 	.get_error = time_sync_get_error,
 	.self_test = biodyn_time_sync_self_test,
 };
-
 
 typedef uint32_t biodyn_timesync_err_t;
 #define BIODYN_TIMESYNC_OK 0x0

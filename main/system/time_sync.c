@@ -15,11 +15,13 @@ static struct
 	biodyn_timesync_err_t ext_err;
 	char ext_err_msg[128];
 	ts_ticker_t ticker;
+	ts_ticker_t rtt;
 } time_sync = {
 	.ticker_task = NULL,
 	.ticker_timer = NULL,
 	.ext_err = BIODYN_TIMESYNC_OK,
 	.ticker = 0,
+	.rtt = 0,
 };
 
 // Tick task
@@ -82,7 +84,7 @@ esp_err_t biodyn_time_sync_init()
 	return res;
 }
 
-ts_ticker_tbiodyn_time_sync_get_ticker()
+ts_ticker_t biodyn_time_sync_get_ticker()
 {
 	return time_sync.ticker;
 }
@@ -94,7 +96,7 @@ esp_err_t biodyn_time_sync_self_test()
 
 bool time_sync_has_error()
 {
-	return time_sync.ext_err == BIODYN_TIMESYNC_OK;
+	return time_sync.ext_err != BIODYN_TIMESYNC_OK;
 }
 
 const char *time_sync_get_error()
@@ -116,5 +118,12 @@ void ble_time_sync_ticker_read(uint16_t *size, void *out)
 {
 	*size = sizeof(time_sync.ticker);
 	memcpy(out, &time_sync.ticker, *size);
-	ESP_LOGI(TAG, "Read ticker as %d", time_sync.ticker);
+	ESP_LOGI(TAG, "Read ticker as %ld", time_sync.ticker);
+}
+
+void ble_time_sync_rtt_read(uint16_t *size, void *out)
+{
+	*size = sizeof(time_sync.rtt);
+	memcpy(out, &time_sync.rtt, *size);
+	ESP_LOGI(TAG, "Read RTT as %ld", time_sync.rtt);
 }
