@@ -4,19 +4,10 @@
 #include "constants.h"
 #include "esp_system.h"
 
-// TODO: STUB. Initialize module
 esp_err_t biodyn_time_sync_init();
-
-// TODO: STUB. Return time-sync ticker.
 uint32_t biodyn_time_sync_get_ticker();
-
-// TODO: STUB. Self-test module
 esp_err_t biodyn_time_sync_self_test();
-
-// TODO: STUB. Return whether there are errors.
 bool time_sync_has_error();
-
-// TODO: STUB. Retrieve error message
 const char *time_sync_get_error();
 
 const static biodyn_system biodyn_time_sync_system = {
@@ -27,5 +18,13 @@ const static biodyn_system biodyn_time_sync_system = {
 	.self_test = biodyn_time_sync_self_test,
 };
 
+
+typedef uint32_t biodyn_timesync_err_t;
+#define BIODYN_TIMESYNC_OK 0x0
+#define BIODYN_TIMESYNC_COULDNT_ADD_ISR 0x1
+#define BIODYN_TIMESYNC_COULDNT_ENABLE_TIMER 0x2
+#define BIODYN_TIMESYNC_COULDNT_START_TIMER 0x4
+#define BIODYN_TIMESYNC_COULDNT_CREATE_TASK 0x8
+#define BIODYN_TIMESYNC_COULDNT_CREATE_TIMER 0x10
 
 #endif // BIODYN_100_TIME_SYNC_H
