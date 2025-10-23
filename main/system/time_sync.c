@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gptimer.h"
+#include "string.h"
 #include "esp_log.h"
 
 #define TAG "TimeSync"
@@ -13,7 +14,7 @@ static struct
 	gptimer_handle_t ticker_timer;
 	biodyn_timesync_err_t ext_err;
 	char ext_err_msg[128];
-	uint32_t ticker;
+	ts_ticker_t ticker;
 } time_sync = {
 	.ticker_task = NULL,
 	.ticker_timer = NULL,
@@ -81,9 +82,9 @@ esp_err_t biodyn_time_sync_init()
 	return res;
 }
 
-uint32_t biodyn_time_sync_get_ticker()
+ts_ticker_tbiodyn_time_sync_get_ticker()
 {
-	return 0;
+	return time_sync.ticker;
 }
 
 esp_err_t biodyn_time_sync_self_test()
@@ -109,4 +110,11 @@ static esp_err_t collect_err(biodyn_timesync_err_t err, const char *msg, esp_err
 	snprintf(time_sync.ext_err_msg, sizeof(time_sync.ext_err_msg), "%s: code %x", msg, code);
 	ESP_LOGE(TAG, "%s: code %x", msg, code);
 	return code;
+}
+
+void ble_time_sync_ticker_read(uint16_t *size, void *out)
+{
+	*size = sizeof(time_sync.ticker);
+	memcpy(out, &time_sync.ticker, *size);
+	ESP_LOGI(TAG, "Read ticker as %d", time_sync.ticker);
 }

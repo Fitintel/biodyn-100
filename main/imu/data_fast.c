@@ -1,12 +1,18 @@
 #include "imu/data_fast.h"
 #include "imu/imu_icm20948_driver.h"
 #include "string.h"
+#include "system/time_sync.h"
 
-#define IMU_DATA_CNT 13
+#define IMU_DATA_CNT 5
+
+typedef struct {
+	imu_motion_data data;
+	ts_ticker_t ticker;
+} timed_read;
 
 static struct
 {
-	imu_motion_data data[IMU_DATA_CNT];
+	timed_read data[IMU_DATA_CNT];
 	int data_cnt;
 	int data_ptr;
 } data_fast = {
@@ -16,9 +22,12 @@ static struct
 
 void data_fast_read()
 {
+	uint32_t read_ticker = biodyn_time_sync_get_ticker();
 	data_fast.data_ptr += 1;
 	data_fast.data_ptr %= data_fast.data_cnt;
-	biodyn_imu_icm20948_read_accel_gyro_mag(&data_fast.data[data_fast.data_ptr]);
+	timed_read *datapoint = &data_fast.data[data_fast.data_ptr];
+	datapoint->ticker = read_ticker;
+	biodyn_imu_icm20948_read_accel_gyro_mag(&datapoint->data);
 }
 
 void ble_data_fast_packed_imu(uint16_t *size, void *out)

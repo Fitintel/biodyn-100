@@ -4,11 +4,15 @@
 #include "constants.h"
 #include "esp_system.h"
 
+typedef uint32_t ts_ticker_t;
+
 esp_err_t biodyn_time_sync_init();
-uint32_t biodyn_time_sync_get_ticker();
+ts_ticker_t biodyn_time_sync_get_ticker();
 esp_err_t biodyn_time_sync_self_test();
 bool time_sync_has_error();
 const char *time_sync_get_error();
+
+void ble_time_sync_ticker_read(uint16_t *size, void *out);
 
 const static biodyn_system biodyn_time_sync_system = {
 	.name = "Time Sync",
