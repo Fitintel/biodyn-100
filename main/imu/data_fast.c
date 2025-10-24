@@ -8,6 +8,7 @@
 #define TAG "DATA_FAST"
 #define IMU_DATA_CNT 10
 
+// Right now we have 4 bytes of padding ... PERFECT for EMG
 typedef struct
 {
 	imu_motion_data data;
