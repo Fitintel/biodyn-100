@@ -79,6 +79,9 @@ const char *biodyn_data_fast_get_error()
 
 void data_fast_read()
 {
+	if (biodyn_imu_icm20948_has_error())
+		return;
+
 	uint32_t read_ticker = biodyn_time_sync_get_ticker();
 	data_fast.data_ptr += 1;
 	data_fast.data_ptr %= data_fast.data_cnt;

@@ -1,6 +1,6 @@
 idf_component_register(
     SRCS
-    "temp/temperature.c"
+    # "temp/temperature.c"
     "imu/imu_icm20948_driver.c"
     "bluetooth/ble.c"
     "system/led.c"
