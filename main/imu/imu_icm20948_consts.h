@@ -19,18 +19,9 @@
 
 #define WHO_AM_I 0x00
 #define REG_BANK_SEL 0x7f
-#define ODR_ALIGN_EN 0x09
 #define PWR_MGMT_1 0x06
 #define PWR_MGMT_2 0x07
 #define USER_CTRL 0x03
-
-#define ACCEL_SMPLRT_DIV_1 0x10
-#define ACCEL_SMPLRT_DIV_2 0x11
-#define ACCEL_CONFIG 0x14
-
-#define GYRO_SMPLRT_DIV 0x00
-#define GYRO_CONFIG_1 0x01
-#define GYRO_CONFIG_2 0x02
 
 #define TEMP_OUT_H 0x39
 #define TEMP_OUT_L 0x3a
@@ -51,12 +42,25 @@
 #define MAG_ZOUT_L EXT_SLV_SENS_DATA_05
 
 // Register bank 1
-#define SELF_TEST_X_GYRO 0x2
-#define SELF_TEST_Y_GYRO 0x3
-#define SELF_TEST_Z_GYRO 0x4
+#define SELF_TEST_X_GYRO 0x02
+#define SELF_TEST_Y_GYRO 0x03
+#define SELF_TEST_Z_GYRO 0x04
+#define SELF_TEST_X_ACCEL 0x0E
+#define SELF_TEST_Y_ACCEL 0x0F
+#define SELF_TEST_Z_ACCEL 0x10
 
 #define READ_MSB 0x80
 #define WRITE_MSB 0x00
+
+// Register bank 2
+#define GYRO_SMPLRT_DIV 0x00
+#define GYRO_CONFIG_1 0x01
+#define GYRO_CONFIG_2 0x02
+#define ODR_ALIGN_EN 0x09
+#define ACCEL_SMPLRT_DIV_1 0x10
+#define ACCEL_SMPLRT_DIV_2 0x11
+#define ACCEL_CONFIG 0x14
+#define ACCEL_CONFIG_2 0x15
 
 // Register bank 3
 #define I2C_MST_ODR_CONFIG 0x00
