@@ -6,7 +6,7 @@ idf_component_register(
     "system/led.c"
     "system/self_test.c"
     "system/time_sync.c"
-    "imu/data_fast.c"
+    "system/data_fast.c"
     "main.c"
     INCLUDE_DIRS "."
 )

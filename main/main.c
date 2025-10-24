@@ -19,11 +19,7 @@
 #include "bluetooth/ble.h"
 #include "bluetooth/ble_profiles.h"
 #include "biodyn_systems.h"
-#include "imu/data_fast.h"
-
-void test_accel_imu_icm20948();
-void test_all_registers_imu_icm20948();
-void test_accel_gyro_imu_icm20948();
+#include "system/data_fast.h"
 
 // APP ENTRY POINT
 void app_main(void)

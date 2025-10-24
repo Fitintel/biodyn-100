@@ -11,7 +11,7 @@ const char *biodyn_data_fast_get_error();
 void data_fast_read();
 
 // BLE callback
-void ble_data_fast_packed_imu(uint16_t *size, void *out);
+void ble_data_fast_packed(uint16_t *size, void *out);
 
 const static biodyn_system biodyn_data_fast_system = {
 	.name = "Data Fast",

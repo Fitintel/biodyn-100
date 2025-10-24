@@ -1,4 +1,4 @@
-#include "imu/data_fast.h"
+#include "system/data_fast.h"
 #include "imu/imu_icm20948_driver.h"
 #include "string.h"
 #include "freertos/FreeRTOS.h"
@@ -8,12 +8,12 @@
 #define TAG "DATA_FAST"
 #define IMU_DATA_CNT 10
 
-// Right now we have 4 bytes of padding ... PERFECT for EMG
 typedef struct
 {
-	imu_motion_data data;
-	ts_ticker_t ticker;
-} timed_read;
+	ts_ticker_t ticker; // ----  8 bytes
+	imu_motion_data data; // -- 36 bytes
+	float emg; // -------------  4 bytes
+} timed_read; // TOTAL: 48 bytes aligned on 8
 
 static struct
 {
@@ -79,18 +79,16 @@ const char *biodyn_data_fast_get_error()
 
 void data_fast_read()
 {
-	if (biodyn_imu_icm20948_has_error())
-		return;
-
-	uint32_t read_ticker = biodyn_time_sync_get_ticker();
+	ts_ticker_t read_ticker = biodyn_time_sync_get_ticker();
 	data_fast.data_ptr += 1;
 	data_fast.data_ptr %= data_fast.data_cnt;
 	timed_read *datapoint = &data_fast.data[data_fast.data_ptr];
 	datapoint->ticker = read_ticker;
+	datapoint->emg = 0;
 	biodyn_imu_icm20948_read_accel_gyro_mag(&datapoint->data);
 }
 
-void ble_data_fast_packed_imu(uint16_t *size, void *out)
+void ble_data_fast_packed(uint16_t *size, void *out)
 {
 	int current_size = data_fast.data_ptr;
 	int old_size = data_fast.data_cnt - data_fast.data_ptr;
@@ -98,6 +96,8 @@ void ble_data_fast_packed_imu(uint16_t *size, void *out)
 	memcpy(out + (old_size * sizeof(timed_read)), p, current_size * sizeof(timed_read));
 	memcpy(out, p, old_size * sizeof(timed_read));
 	*size = IMU_DATA_CNT * sizeof(timed_read);
+	timed_read *latest = &((timed_read *) out)[IMU_DATA_CNT - 1];
+	ESP_LOGI(TAG, "x: %.2f, y: %.2f, z: %.2f at %lld", latest->data.accel_x, latest->data.accel_y, latest->data.accel_z, latest->ticker);
 }
 
 static esp_err_t collect_err(biodyn_timesync_err_t err, const char *msg, esp_err_t code)
