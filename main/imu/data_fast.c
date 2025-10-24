@@ -6,7 +6,7 @@
 #include "system/time_sync.h"
 
 #define TAG "DATA_FAST"
-#define IMU_DATA_CNT 12
+#define IMU_DATA_CNT 10
 
 typedef struct {
 	imu_motion_data data;

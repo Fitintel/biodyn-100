@@ -4,7 +4,7 @@
 #include "constants.h"
 #include "esp_system.h"
 
-typedef uint32_t ts_ticker_t;
+typedef uint64_t ts_ticker_t;
 
 esp_err_t biodyn_time_sync_init();
 ts_ticker_t biodyn_time_sync_get_ticker();
