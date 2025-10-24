@@ -1,8 +1,4 @@
 menu "BIODYN-100 Config"
-
-    config DEVICE_MODEL_NUMBER
-        string "Device model number" 
-        help
-			The device model number.
+	
 endmenu
 

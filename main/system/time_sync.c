@@ -61,7 +61,7 @@ ts_ticker_t biodyn_time_sync_get_ticker()
 esp_err_t biodyn_time_sync_self_test()
 {
 	esp_err_t err = ESP_OK;
-	
+
 	uint64_t ticker;
 	err = gptimer_get_raw_count(time_sync.ticker_timer, &ticker);
 	if (err != ESP_OK)
@@ -104,4 +104,36 @@ void ble_time_sync_rtt_read(uint16_t *size, void *out)
 	*size = sizeof(time_sync.rtt);
 	memcpy(out, &time_sync.rtt, *size);
 	ESP_LOGI(TAG, "Read RTT as %lld", time_sync.rtt);
+}
+
+void ble_time_sync_ticker_write(uint16_t size, void *src)
+{
+	if (size < sizeof(ts_ticker_t))
+	{
+		collect_err(BIODYN_TIMESYNC_TOO_LITTLE_DATA_WRIT, "Not enough data, got %d", size);
+		return;
+	}
+
+	uint64_t ticker = 0;
+	memcpy(&ticker, src, sizeof(ts_ticker_t));
+	ticker += time_sync.rtt >> 1;
+	esp_err_t res = gptimer_set_raw_count(time_sync.ticker_timer, ticker);
+	if (res != ESP_OK)
+	{
+		collect_err(BIODYN_TIMESYNC_COUDLNT_WRITE_TIMER, "Couldn't write ticker: code", res);
+		return;
+	}
+	ESP_LOGI(TAG, "Wrote new ticker: %lld", ticker);
+}
+
+void ble_time_sync_rtt_write(uint16_t size, void *src)
+{
+	if (size < sizeof(ts_ticker_t))
+	{
+		collect_err(BIODYN_TIMESYNC_TOO_LITTLE_DATA_WRIT, "Not enough data, got %d", size);
+		return;
+	}
+
+	memcpy(&time_sync.rtt, src, sizeof(ts_ticker_t));
+	ESP_LOGI(TAG, "Wrote new RTT: %lld", time_sync.rtt);
 }

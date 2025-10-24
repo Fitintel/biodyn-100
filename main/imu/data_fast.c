@@ -8,7 +8,8 @@
 #define TAG "DATA_FAST"
 #define IMU_DATA_CNT 10
 
-typedef struct {
+typedef struct
+{
 	imu_motion_data data;
 	ts_ticker_t ticker;
 } timed_read;
@@ -31,24 +32,26 @@ static esp_err_t collect_err(biodyn_timesync_err_t err, const char *msg, esp_err
 
 void read_task(void *usr_data)
 {
-    TickType_t last_wake_time = xTaskGetTickCount();
-    const TickType_t period = pdMS_TO_TICKS(15);
+	TickType_t last_wake_time = xTaskGetTickCount();
+	const TickType_t period = pdMS_TO_TICKS(15);
 
-    while (1) {
+	while (1)
+	{
 		data_fast_read();
-        vTaskDelayUntil(&last_wake_time, period);
-    }
+		vTaskDelayUntil(&last_wake_time, period);
+	}
 }
 
 esp_err_t biodyn_data_fast_init()
 {
 	int data_len = IMU_DATA_CNT * sizeof(timed_read);
-	ESP_LOGI(TAG, "Data len is %d", data_len);
+	ESP_LOGI(TAG, "Data len is %d from %d datapoints of size %d bytes", data_len, IMU_DATA_CNT, sizeof(timed_read));
 	if (data_len >= 517)
 		collect_err(BIODYN_DATAFAST_TOO_MUCH_DATA, "Data len was too great, got ", data_len);
 
 	BaseType_t res = xTaskCreate(read_task, TAG, 4096, NULL, 5, &data_fast.read_task);
-	if (res != pdTRUE) {
+	if (res != pdTRUE)
+	{
 		collect_err(BIODYN_DATAFAST_COULDNT_CREATE_TASK, "Couldn't create task: code", res);
 		return -1;
 	}

@@ -28,7 +28,7 @@ const static struct biodyn_ble_characteristic data_fast_chars[] = {
 		.permissions = BIODYN_PERM_READ_WRITE,
 		.properties = BIODYN_PROP_READ_WRITE,
 		// TODO: Implement time sync hearbeat read/write
-		// .set_data = ,
+		.set_data = ble_time_sync_ticker_write,
 		.get_data = ble_time_sync_ticker_read,
 	},
 	{
@@ -37,7 +37,7 @@ const static struct biodyn_ble_characteristic data_fast_chars[] = {
 		.permissions = BIODYN_PERM_READ_WRITE,
 		.properties = BIODYN_PROP_READ_WRITE,
 		// TODO: Implement time sync round trip time (RTT) read/write
-		// .set_data = ,
+		.set_data = ble_time_sync_rtt_write,
 		.get_data = ble_time_sync_rtt_read,
 	},
 };
