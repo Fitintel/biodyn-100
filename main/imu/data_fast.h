@@ -22,4 +22,9 @@ const static biodyn_system biodyn_data_fast_system = {
 	.self_test = biodyn_data_fast_self_test,
 };
 
+typedef uint32_t biodyn_df_err_t;
+#define BIODYN_DATAFAST_OK 0x0
+#define BIODYN_DATAFAST_COULDNT_CREATE_TASK 0x1
+#define BIODYN_DATAFAST_TOO_MUCH_DATA 0x2
+
 #endif	// BIODYN_DATA_FAST_H
