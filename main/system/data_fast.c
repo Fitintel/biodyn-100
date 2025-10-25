@@ -40,9 +40,10 @@ static esp_err_t collect_err(biodyn_timesync_err_t err, const char *msg, esp_err
 void read_task(void *usr_data)
 {
 	TickType_t last_wake_time = xTaskGetTickCount();
-	const TickType_t period = pdMS_TO_TICKS(15);
+	// This is the fastest we can go without gptimer or increasing tick rate
+	const TickType_t period = pdMS_TO_TICKS(10); 
 
-	while (1)
+	for (;;)
 	{
 		data_fast_read();
 		vTaskDelayUntil(&last_wake_time, period);
@@ -94,15 +95,19 @@ void data_fast_read()
 {
 	ts_ticker_t read_ticker = biodyn_time_sync_get_ticker();
 
-	// Take mutex
+	// Read local before taking mutex
+	imu_motion_data data;
+	biodyn_imu_icm20948_read_accel_gyro_mag(&data);
+
+	// Take mutex 
 	if (xSemaphoreTake(data_fast.data_mutex, portMAX_DELAY))
 	{
 		data_fast.data_ptr += 1;
 		data_fast.data_ptr %= data_fast.data_cnt;
 		timed_read *datapoint = &data_fast.data[data_fast.data_ptr];
 		datapoint->ticker = read_ticker;
+		datapoint->data = data;
 		datapoint->emg = 0;
-		biodyn_imu_icm20948_read_accel_gyro_mag(&datapoint->data);
 		xSemaphoreGive(data_fast.data_mutex); // Give mutex
 	}
 }
@@ -118,8 +123,8 @@ void ble_data_fast_packed(uint16_t *size, void *out)
 		memcpy(out + (old_size * sizeof(timed_read)), p, current_size * sizeof(timed_read));
 		memcpy(out, p, old_size * sizeof(timed_read));
 		*size = IMU_DATA_CNT * sizeof(timed_read);
-		timed_read *latest = &((timed_read *)out)[IMU_DATA_CNT - 1];
-		ESP_LOGI(TAG, "x: %.2f, y: %.2f, z: %.2f at %lld", latest->data.accel_x, latest->data.accel_y, latest->data.accel_z, latest->ticker);
+		// timed_read *latest = &((timed_read *)out)[IMU_DATA_CNT - 1];
+		// ESP_LOGI(TAG, "x: %.2f, y: %.2f, z: %.2f at %lld", latest->data.accel_x, latest->data.accel_y, latest->data.accel_z, latest->ticker);
 		xSemaphoreGive(data_fast.data_mutex); // Give mutex
 	}
 }
