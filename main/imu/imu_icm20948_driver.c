@@ -602,7 +602,7 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
 	temp |= (0b111 << 5);
 	biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_2, temp);
-	vtaskDelay(pdMS_TO_TICKS(50));
+	vTaskDelay(pdMS_TO_TICKS(50));
 
 	// Sensor output with self_test_enabled
 	biodyn_imu_icm20948_read_accel_gyro_mag(&imd_st_on);
@@ -617,10 +617,85 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	deltas.gyro_z = imd_st_on.gyro_z - imd_st_off.gyro_z;
 
 	// Obtain factory self_test results from icm20948 self_test registers to compare to.
+	uint8_t trimax = 0;
+	uint8_t trimay = 0;
+	uint8_t trimaz = 0;
+	uint8_t trimgx = 0;
+	uint8_t trimgy = 0;
+	uint8_t trimgz = 0;
+
+	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_X_ACCEL, &trimax);
+	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_Y_ACCEL, &trimay);
+	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_Z_ACCEL, &trimaz);
+	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_X_GYRO, &trimgx);
+	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_Y_GYRO, &trimgy);
+	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_Z_GYRO, &trimgz);
+
+	// Compare trims to with a range limiter to deltas
+	// Compare within magnitude by 50% range (might need to be adjusted)
+	float RL = 0.5;
+	float RH = 1.5;
+
+	// CHECK if deltas-trim is between rangel*trim and rangeh*trim
+	// return error on fails
+	if (RL * trimax < deltas.accel_x || RH * trimax > deltas.accel_x)
+	{
+		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on ax");
+	}
+	else
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on ax");
+		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
+	}
+	if (RL * trimax < deltas.accel_y || RH * trimax > deltas.accel_y)
+	{
+		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on ay");
+	}
+	else
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on ay");
+		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
+	}
+	if (RL * trimax < deltas.accel_z || RH * trimax > deltas.accel_z)
+	{
+		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on az");
+	}
+	else
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on az");
+		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
+	}
+	if (RL * trimax < deltas.gyro_x || RH * trimax > deltas.gyro_x)
+	{
+		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on gx");
+	}
+	else
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gx");
+		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
+	}
+	if (RL * trimax < deltas.gyro_x || RH * trimax > deltas.gyro_x)
+	{
+		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on gy");
+	}
+	else
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gy");
+		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
+	}
+	if (RL * trimax < deltas.gyro_z || RH * trimax > deltas.gyro_z)
+	{
+		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on gz");
+	}
+	else
+	{
+		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gz");
+		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
+	}
 
 	// Clear self_test bits
 	// ACCEL SELF_TEST END
-	uint8_t temp = 0;
+	temp = 0;
 	biodyn_imu_icm20948_read_reg(_b2, ACCEL_CONFIG_2, &temp);
 	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
 	temp &= ~(0b111 << 5);
@@ -632,10 +707,12 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
 	temp &= ~(0b111 << 5);
 	biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_2, temp);
+
+	return BIODYN_IMU_OK;
 }
 
-// TODO: also check gyro self-test
-static biodyn_imu_err_t self_test_accel()
+// TESTING accel_gyro replacement
+/*static biodyn_imu_err_t self_test_accel()
 {
 	// SELF-TEST RESPONSE = SENSOR OUTPUT WITH SELF-TEST ENABLED – SENSOR OUTPUT WITHOUT SELF-TEST ENABLED (p. 24)
 	// Sensor output without self_test_enabled
@@ -650,13 +727,10 @@ static biodyn_imu_err_t self_test_accel()
 	temp |= 0b00011100;
 	biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG_2, temp);
 	// SELF_TEST ACCEL STARTED
+	return BIODYN_IMU_OK;
 }
 
-// TODO: Fix this self-test
-/**
- * Self-test the gyroscope of the IMU.
- * Checks the built-in self-test in the IMU, which identifies if it's gyroscope is working.
- */
+
 static biodyn_imu_err_t self_test_gyro()
 {
 	biodyn_imu_err_t err;
@@ -683,6 +757,7 @@ static biodyn_imu_err_t self_test_gyro()
 
 	return BIODYN_IMU_OK;
 }
+*/
 
 /**
  * Self-test the magnetometer of the IMU.
@@ -735,15 +810,21 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 		ESP_LOGE(TAG, "Self test failed - user banks (%x)", err);
 		return err;
 	}
-	// Run gyro self-test
-	if ((err = self_test_gyro()))
+	// // Run gyro self-test
+	// if ((err = self_test_gyro()))
+	// {
+	// 	ESP_LOGE(TAG, "Self test failed - gyro (%x)", err);
+	// }
+	// // Run accel self-test
+	// if ((err = self_test_accel()))
+	// {
+	// 	ESP_LOGE(TAG, "Self test failed - accel (%x)", err);
+	// }
+
+	// Run accel and gyro self-test
+	if ((err = self_test_accel_gyro()))
 	{
-		ESP_LOGE(TAG, "Self test failed - gyro (%x)", err);
-	}
-	// Run accel self-test
-	if ((err = self_test_accel()))
-	{
-		ESP_LOGE(TAG, "Self test failed - accel (%x)", err);
+		ESP_LOGE(TAG, "Self test failed - accel and gyro (%x)", err);
 	}
 
 	// Run mag self-test

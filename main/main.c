@@ -20,9 +20,10 @@
 #include "bluetooth/ble_profiles.h"
 #include "biodyn_systems.h"
 
-void test_accel_imu_icm20948();
-void test_all_registers_imu_icm20948();
-void test_accel_gyro_imu_icm20948();
+// void test_accel_imu_icm20948();
+// void test_all_registers_imu_icm20948();
+// void test_accel_gyro_imu_icm20948();
+void test_imu_icm20948();
 
 // APP ENTRY POINT
 void app_main(void)
@@ -68,6 +69,8 @@ void app_main(void)
 	// 	test_all_registers_imu_icm20948();
 	// 	test_accel_imu_icm20948();
 	// 	test_accel_gyro_imu_icm20948();
+
+	test_imu_icm20948();
 }
 
 void test_imu_icm20948()
