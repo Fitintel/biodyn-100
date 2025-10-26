@@ -302,7 +302,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	if (err != ESP_OK)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in completing self-test. Further investigation into self-test part functions likely required.");
-		ESP_LOGE(TAG, "Failed to initialize and start AK09916 (magnetometer) device, error %d", err);
+		ESP_LOGE(TAG, "Failed self_test for icm20948, investiage into composite function parts of self_test, error: %d", err);
 		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
 	}
 	// TODO: write self_tests for magnetometer
@@ -831,6 +831,8 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 		ESP_LOGE(TAG, "Self test failed - whoami (%x)", err);
 		return err;
 	}
+	ESP_LOGI(TAG, "Correct WHOAMI");
+
 	// Check that user bank selection works
 	if ((err = self_test_user_banks()))
 	{
