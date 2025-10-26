@@ -3,24 +3,17 @@
 
 #include "constants.h"
 #include "bluetooth/ble.h"
-#include "imu/data_fast.h"
+#include "system/data_fast.h"
 #include "system/time_sync.h"
 
 const static struct biodyn_ble_characteristic data_fast_chars[] = {
 	{
-		.name = "Packed IMU Data",
+		.name = "Packed Collective Data",
 		.uuid = BIODYN_BLE_UUID_16(0x4153),
 		.permissions = BIODYN_PERM_READ,
 		.properties = BIODYN_PROP_READ,
-		.get_data = ble_data_fast_packed_imu,
-	},
-	{
-		.name = "Packed Collective Data",
-		.uuid = BIODYN_BLE_UUID_16(0x4155),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
 		// TODO: Implement packed collective data read
-		// .get_data = ,
+		.get_data = ble_data_fast_packed,
 	},
 	{
 		.name = "Heartbeat",

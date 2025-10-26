@@ -5,7 +5,7 @@
 #include "system/time_sync.h"
 #include "system/led.h"
 #include "imu/imu_icm20948_driver.h"
-#include "imu/data_fast.h"
+#include "system/data_fast.h"
 
 // Order is order of initialization
 const static biodyn_system biodyn_systems[] = {

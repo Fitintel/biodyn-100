@@ -12,6 +12,9 @@ esp_err_t biodyn_time_sync_self_test();
 bool time_sync_has_error();
 const char *time_sync_get_error();
 
+double ts_ticker_t_to_ms(ts_ticker_t t);
+ts_ticker_t ms_to_ts_ticker_t(double ms);
+
 // BLE callbacks
 void ble_time_sync_ticker_read(uint16_t *size, void *out);
 void ble_time_sync_ticker_write(uint16_t size, void *src);
