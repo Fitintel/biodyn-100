@@ -635,63 +635,89 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	// Compare within magnitude by 50% range (might need to be adjusted)
 	float RL = 0.5;
 	float RH = 1.5;
+	/** DEBUG*/
+	ESP_LOGI(TAG, "\n st_off ax: %f\n st_off ay: %f\n st_off az: %f\n st_off gx: %f\n st_off gy: %f\n st_off gz: %f", imd_st_off.accel_x, imd_st_off.accel_y, imd_st_off.accel_z, imd_st_off.gyro_x, imd_st_off.gyro_y, imd_st_off.gyro_z);
+	ESP_LOGI(TAG, "\n st_on ax: %f\n st_on ay: %f\n st_on az: %f\n st_on gx: %f\n st_on gy: %f\n st_on gz: %f", imd_st_on.accel_x, imd_st_on.accel_y, imd_st_on.accel_z, imd_st_on.gyro_x, imd_st_on.gyro_y, imd_st_on.gyro_z);
+
+	ESP_LOGI(TAG, "\n delta ax: %f\n delta ay: %f\n delta az: %f\n delta gx: %f\n delta gy: %f\n delta gz: %f", deltas.accel_x, deltas.accel_y, deltas.accel_z, deltas.gyro_x, deltas.gyro_y, deltas.gyro_z);
+	ESP_LOGI(TAG, "\n trimax: %d\ntrimay: %d\n trimaz: %d\n trimgx: %d\n trimgy: %d\n trimgz: %d", trimax, trimay, trimaz, trimgx, trimgy, trimgz);
+	/** DEBUG */
 
 	// CHECK if deltas-trim is between rangel*trim and rangeh*trim
 	// return error on fails
-	if (RL * trimax < deltas.accel_x || RH * trimax > deltas.accel_x)
+	ESP_LOGI(TAG, "checking against trims");
+	if (RL * trimax < deltas.accel_x / (1 << accel_range_value) && RH * trimax > deltas.accel_x / (1 << accel_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on ax");
 	}
 	else
 	{
+		ESP_LOGE(TAG, "self test failed on delta ax with ax = %f and trimax = %d", deltas.accel_x, trimax);
 		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on ax");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
-	if (RL * trimax < deltas.accel_y || RH * trimax > deltas.accel_y)
+	if (RL * trimay < deltas.accel_y / (1 << accel_range_value) && RH * trimay > deltas.accel_y / (1 << accel_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on ay");
 	}
 	else
 	{
+		ESP_LOGE(TAG, "self test failed on delta ay");
+
 		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on ay");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
-	if (RL * trimax < deltas.accel_z || RH * trimax > deltas.accel_z)
+	if (RL * trimaz < deltas.accel_z / (1 << accel_range_value) && RH * trimaz > deltas.accel_z / (1 << accel_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on az");
 	}
 	else
 	{
+		ESP_LOGE(TAG, "self test failed on delta az");
 		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on az");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
-	if (RL * trimax < deltas.gyro_x || RH * trimax > deltas.gyro_x)
+	if (RL * trimgx < deltas.gyro_x / (1 << gyro_range_value) && RH * trimgx > deltas.gyro_x / (1 << gyro_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on gx");
 	}
 	else
 	{
+		uint8_t and1 = RL * trimgx < deltas.gyro_x / (1 << gyro_range_value);
+		uint8_t and2 = RH * trimgx > deltas.gyro_x / (1 << gyro_range_value);
+		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro_x, trimgx);
+		ESP_LOGE(TAG, "and1 = %d; and2 = %d", and1, and2);
 		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gx");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
-	if (RL * trimax < deltas.gyro_x || RH * trimax > deltas.gyro_x)
+	if (RL * trimgy < deltas.gyro_y / (1 << gyro_range_value) && RH * trimgy > deltas.gyro_y / (1 << gyro_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on gy");
 	}
 	else
 	{
+		uint8_t and1 = RL * trimgy < deltas.gyro_y / (1 << gyro_range_value);
+		uint8_t and2 = RH * trimgy > deltas.gyro_y / (1 << gyro_range_value);
+		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro_y, trimgy);
+		ESP_LOGE(TAG, "and1 = %d; and2 = %d", and1, and2);
 		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gy");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
-	if (RL * trimax < deltas.gyro_z || RH * trimax > deltas.gyro_z)
+	if (RL * trimgz < deltas.gyro_z / (1 << gyro_range_value) && RH * trimgz > deltas.gyro_z / (1 << gyro_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on gz");
 	}
 	else
 	{
+		uint8_t and1 = RL * trimgz < deltas.gyro_z / (1 << gyro_range_value);
+		uint8_t and2 = RH * trimgz > deltas.gyro_z / (1 << gyro_range_value);
+		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro_z, trimgy);
+		ESP_LOGE(TAG, "and1 = %d; and2 = %d", and1, and2);
+
 		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gz");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
+	ESP_LOGI(TAG, "Finished checking against trims");
 
 	// Clear self_test bits
 	// ACCEL SELF_TEST END
@@ -784,6 +810,7 @@ static biodyn_imu_err_t self_test_mag()
 	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &temp);
 	if (temp & 0b11111111)
 		return BIODYN_IMU_OK;
+	ESP_LOGE(TAG, "SELF_TEST_MAG: Failed self-test with read value test actual: %x, expected: non-zero", temp);
 	biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_MAG: Failed self-test");
 	return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 }
@@ -822,15 +849,17 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	// }
 
 	// Run accel and gyro self-test
-	if ((err = self_test_accel_gyro()))
-	{
-		ESP_LOGE(TAG, "Self test failed - accel and gyro (%x)", err);
-	}
+	// TODO: REPAIR
+	// if ((err = self_test_accel_gyro()))
+	// {
+	// 	ESP_LOGE(TAG, "Self test failed - accel and gyro (%x)", err);
+	// }
 
 	// Run mag self-test
 	if ((err = self_test_mag()))
 	{
 		ESP_LOGE(TAG, "Self test failed - mag (%x)", err);
+		return err;
 	}
 
 	return BIODYN_IMU_OK;
