@@ -5,7 +5,7 @@
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 #include "math.h"
-#include "esp_task.h"
+#include "freertos/task.h"
 #include "string.h"
 #include "esp_mac.h"
 #include "esp_system.h"
