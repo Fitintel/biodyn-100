@@ -27,12 +27,14 @@ static struct
 
 	char ext_err_msg[128];
 	biodyn_df_err_t ext_err;
+	double max_read_delay_before_err;
 } data_fast = {
 	.data_cnt = IMU_DATA_CNT,
 	.data_ptr = 0,
 	.read_task = NULL,
 	.data_mutex = NULL,
 	.ext_err = BIODYN_DATAFAST_OK,
+	.max_read_delay_before_err = 15,
 };
 
 static esp_err_t collect_err(biodyn_timesync_err_t err, const char *msg, esp_err_t code);
@@ -41,12 +43,26 @@ void read_task(void *usr_data)
 {
 	TickType_t last_wake_time = xTaskGetTickCount();
 	// This is the fastest we can go without gptimer or increasing tick rate
-	const TickType_t period = pdMS_TO_TICKS(10); 
+	const TickType_t period = pdMS_TO_TICKS(10);
 
 	for (;;)
 	{
+		ts_ticker_t tick_before = biodyn_time_sync_get_ticker();
 		data_fast_read();
 		vTaskDelayUntil(&last_wake_time, period);
+
+		// Ensure we're reading fast enough
+		ts_ticker_t tick_after = biodyn_time_sync_get_ticker();
+		double read_time_ms = ts_ticker_t_to_ms(tick_after - tick_before);
+		if (read_time_ms > data_fast.max_read_delay_before_err)
+		{
+			data_fast.ext_err |= BIODYN_DATAFAST_RUNNING_TOO_SLOW;
+			snprintf(data_fast.ext_err_msg, sizeof(data_fast.ext_err_msg),
+					 "DataFast trying to run at %.1lfms, instead is %.1lfms",
+					 data_fast.max_read_delay_before_err, read_time_ms);
+		} else {
+			data_fast.ext_err &= ~BIODYN_DATAFAST_RUNNING_TOO_SLOW;
+		}
 	}
 }
 
@@ -76,6 +92,7 @@ esp_err_t biodyn_data_fast_init()
 
 esp_err_t biodyn_data_fast_self_test()
 {
+
 	return biodyn_data_fast_has_error() ? -1 : ESP_OK;
 }
 
@@ -99,7 +116,7 @@ void data_fast_read()
 	imu_motion_data data;
 	biodyn_imu_icm20948_read_accel_gyro_mag(&data);
 
-	// Take mutex 
+	// Take mutex
 	if (xSemaphoreTake(data_fast.data_mutex, portMAX_DELAY))
 	{
 		data_fast.data_ptr += 1;
@@ -129,7 +146,7 @@ void ble_data_fast_packed(uint16_t *size, void *out)
 	}
 }
 
-static esp_err_t collect_err(biodyn_timesync_err_t err, const char *msg, esp_err_t code)
+static esp_err_t collect_err(biodyn_df_err_t err, const char *msg, esp_err_t code)
 {
 	data_fast.ext_err |= err;
 	snprintf(data_fast.ext_err_msg, sizeof(data_fast.ext_err_msg), "%s %x", msg, code);

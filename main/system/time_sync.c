@@ -137,3 +137,13 @@ void ble_time_sync_rtt_write(uint16_t size, void *src)
 	memcpy(&time_sync.rtt, src, sizeof(ts_ticker_t));
 	ESP_LOGI(TAG, "Wrote new RTT: %lld", time_sync.rtt);
 }
+
+double ts_ticker_t_to_ms(ts_ticker_t t)
+{
+	return (double)t / 1000.0;
+}
+
+ts_ticker_t ms_to_ts_ticker_t(double ms)
+{
+	return (ts_ticker_t)(ms * 1000.0);
+}
