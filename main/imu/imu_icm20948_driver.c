@@ -1162,3 +1162,13 @@ biodyn_imu_err_t biodyn_imu_icm20948_config_accel_sample_averaging(uint8_t dec3_
 {
 	return BIODYN_IMU_OK;
 }
+
+biodyn_imu_err_t biodyn_imu_icm20948_test_gyro(uint8_t *out)
+{
+	biodyn_imu_err_t err;
+	if ((err = biodyn_imu_icm20948_read_reg(_b0, GYRO_XOUT_H, out)))
+	{
+		return err;
+	}
+	return BIODYN_IMU_OK;
+}
