@@ -864,18 +864,11 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	// }
 
 	// Run mag self-test
-<<<<<<< HEAD
-	// if ((err = self_test_mag()))
-	// {
-	// 	ESP_LOGE(TAG, "Self test failed - mag (%x)", err);
-	// }
-=======
 	if ((err = self_test_mag()))
 	{
 		ESP_LOGE(TAG, "Self test failed - mag (%x)", err);
 		return err;
 	}
->>>>>>> imu_subsystems
 
 	return BIODYN_IMU_OK;
 }
