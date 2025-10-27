@@ -995,16 +995,16 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
 
 	// Byte shifting for full high and low register with proper endianness
-	int16_t raw_ax = ((uint16_t)out[0] << 8) | out[1];
-	int16_t raw_ay = ((uint16_t)out[2] << 8) | out[3];
-	int16_t raw_az = ((uint16_t)out[4] << 8) | out[5];
-	int16_t raw_gx = ((uint16_t)out[6] << 8) | out[7];
-	int16_t raw_gy = ((uint16_t)out[8] << 8) | out[9];
-	int16_t raw_gz = ((uint16_t)out[10] << 8) | out[11];
+	int16_t raw_ax = ((int16_t)out[0] << 8) | out[1];
+	int16_t raw_ay = ((int16_t)out[2] << 8) | out[3];
+	int16_t raw_az = ((int16_t)out[4] << 8) | out[5];
+	int16_t raw_gx = ((int16_t)out[6] << 8) | out[7];
+	int16_t raw_gy = ((int16_t)out[8] << 8) | out[9];
+	int16_t raw_gz = ((int16_t)out[10] << 8) | out[11];
 	// gap of two bytes between accel + gyro and mag for temperature registers
-	int16_t raw_mx = ((uint16_t)out[15] << 8) | out[14];
-	int16_t raw_my = ((uint16_t)out[17] << 8) | out[16];
-	int16_t raw_mz = ((uint16_t)out[19] << 8) | out[18];
+	int16_t raw_mx = ((int16_t)out[14] << 8) | out[15];
+	int16_t raw_my = ((int16_t)out[16] << 8) | out[17];
+	int16_t raw_mz = ((int16_t)out[18] << 8) | out[19];
 	// ESP_LOGI("TAG", "Raw Accel: %d, %d, %d", raw_ax, raw_ay, raw_az);
 
 	data->accel_x = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
@@ -1015,9 +1015,9 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	data->gyro_y = (float)raw_gy / gyro_sensitivity_scale_factor;
 	data->gyro_z = (float)raw_gz / gyro_sensitivity_scale_factor;
 
-	data->gyro_x = (float)raw_mx * MAG_SENSITIVITY_SCALE_FACTOR;
-	data->gyro_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
-	data->gyro_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->mag_x = (float)raw_mx * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->mag_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->mag_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
 
 	// TEST: read status2 register of magnetometer as required in p. 79 after each measurement
 	biodyn_imu_ak09916_read_reg(AK09916_STATUS2, 1);
@@ -1165,7 +1165,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_config_accel_sample_averaging(uint8_t dec3_
 
 biodyn_imu_err_t biodyn_imu_icm20948_test_gyro(uint8_t *out)
 {
-	biodyn_imu_err_t err;
+	biodyn_imu_err_t err = 0x00;
 	if ((err = biodyn_imu_icm20948_read_reg(_b0, GYRO_XOUT_H, out)))
 	{
 		return err;

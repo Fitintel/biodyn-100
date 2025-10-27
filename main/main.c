@@ -72,15 +72,16 @@ void app_main(void)
 	// 	test_accel_gyro_imu_icm20948();
 
 	// test_imu_icm20948();
-	// test_accel_gyro_mag_imu_icm20948();
-	vTaskDelay(pdMS_TO_TICKS(100));
-	uint8_t *out = NULL;
-	err = biodyn_imu_icm20948_test_gyro(out);
-	if (err)
-	{
-		ESP_LOGE(MAIN_TAG, "ERROR with gyro test: %x", err);
-	}
-	ESP_LOGI(MAIN_TAG, "got %d as output from gyro test", *out);
+	test_accel_gyro_mag_imu_icm20948();
+	// vTaskDelay(pdMS_TO_TICKS(100));
+	// uint8_t out_value = 0;
+	// uint8_t *out = &out_value;
+	// err = biodyn_imu_icm20948_test_gyro(out);
+	// if (err)
+	// {
+	// 	ESP_LOGE(MAIN_TAG, "ERROR with gyro test: %x", err);
+	// }
+	// ESP_LOGI(MAIN_TAG, "got %d as output from gyro test", *out);
 }
 
 void test_imu_icm20948()
