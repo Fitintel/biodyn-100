@@ -212,20 +212,30 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	ESP_LOGI(TAG, "\tPlanar sensitivity factor: %d", accel_sensitivity_scale_factor);
 	ESP_LOGI(TAG, "\tGyro sensitivity factor: %f", gyro_sensitivity_scale_factor);
 
-	// Reset IMU
-	// Start error collection,
-	err = biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x81);
-
+	// Reset IMU, wakes chip from sleep mode, turns off low power feature,
+	// disables temperature sensor, and sets clock source to auto-select.
+	err = biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x89);
+	vTaskDelay(pdMS_TO_TICKS(100));
 	// Exit from sleep and select clock 37
-	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	// DEBUG: doesn't this sleep the chip again?
+	// err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
 	// Turn off low power mode
+	// This shouldn't matter because lp_config is disabled in pwr_mgmt1 by turning off low power feature
 	err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
 	// ERROR: Retry turning off sleep mode of icm20948
-	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	// TEST: what actually changes sleep
+	// err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x41);
 
 	// Align output data rate
-	err |= biodyn_imu_icm20948_write_reg(_b2, ODR_ALIGN_EN, 0x00);
+	// ODR start-time alignements starts when any of the following is written to:
+	/**
+	 * GYRO_SMPLRT_DIV,
+	 * ACCEL_SMPLRT_DIV_1,
+	 * ACCEL_SMPLRT_DIV_2,
+	 * I2C_MST_ODR_CONFIG
+	 */
+	err |= biodyn_imu_icm20948_write_reg(_b2, ODR_ALIGN_EN, 0x01);
 
 	// Gyroscope config with sample rate divider = 0
 	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_SMPLRT_DIV, 0x00);
@@ -266,10 +276,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// Wake up all sensors
 	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
 
-	// Turn off low power mode
+	// // Turn off low power mode
 	err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
-	// ERROR: Retry turning off sleep mode of icm20948
-	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	// // ERROR: Retry turning off sleep mode of icm20948
+	// err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
 
 	// ERROR CHECKPOINT *INIT2*
 	// Check err status to report any error if found
@@ -737,54 +747,6 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	return BIODYN_IMU_OK;
 }
 
-// TESTING accel_gyro replacement
-/*static biodyn_imu_err_t self_test_accel()
-{
-	// SELF-TEST RESPONSE = SENSOR OUTPUT WITH SELF-TEST ENABLED – SENSOR OUTPUT WITHOUT SELF-TEST ENABLED (p. 24)
-	// Sensor output without self_test_enabled
-	uint8_t st_off_xh = 0;
-
-	// biodyn_imu_icm20948_read_reg(_b0, ACCEL_XOUT_H, )
-
-	// Use accel_config_2 to start self test on all axes
-	uint8_t temp = 0;
-	biodyn_imu_icm20948_read_reg(_b2, ACCEL_CONFIG_2, &temp);
-	// [7:5] reserved, [4:2] xyz self-test enables, [1:0] accel sample decimator (see function ...accel_number_samples_averaged)
-	temp |= 0b00011100;
-	biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG_2, temp);
-	// SELF_TEST ACCEL STARTED
-	return BIODYN_IMU_OK;
-}
-
-
-static biodyn_imu_err_t self_test_gyro()
-{
-	biodyn_imu_err_t err;
-
-	// Get previous gyro2 config
-	uint8_t gyro2_cfg = 0;
-	if ((err = biodyn_imu_icm20948_read_reg(2, GYRO_CONFIG_2, &gyro2_cfg)))
-	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "SELF_TEST_GYRO: Failed self-test");
-		ESP_LOGE(TAG, "Failed to read GYRO_CONFIG_2: %x", err);
-		return err;
-	}
-	ESP_LOGI(TAG, "Got GYRO_CONFIG_2: %x", gyro2_cfg);
-
-	// TODO: Add self-test
-
-	// TODO: Write new gyro2 config with self-test
-
-	// TODO: Read gyro self-test values
-
-	// TODO: Write gyro2 config without self-test
-
-	// TODO: Add error logging for above features
-
-	return BIODYN_IMU_OK;
-}
-*/
-
 /**
  * Self-test the magnetometer of the IMU.
  * Uses the built-in structure of the AK09916 to perform self-tests on it's condition.
@@ -839,16 +801,6 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 		ESP_LOGE(TAG, "Self test failed - user banks (%x)", err);
 		return err;
 	}
-	// // Run gyro self-test
-	// if ((err = self_test_gyro()))
-	// {
-	// 	ESP_LOGE(TAG, "Self test failed - gyro (%x)", err);
-	// }
-	// // Run accel self-test
-	// if ((err = self_test_accel()))
-	// {
-	// 	ESP_LOGE(TAG, "Self test failed - accel (%x)", err);
-	// }
 
 	// Run accel and gyro self-test
 	// TODO: REPAIR
@@ -1005,7 +957,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	int16_t raw_mx = ((int16_t)out[14] << 8) | out[15];
 	int16_t raw_my = ((int16_t)out[16] << 8) | out[17];
 	int16_t raw_mz = ((int16_t)out[18] << 8) | out[19];
-	// ESP_LOGI("TAG", "Raw Accel: %d, %d, %d", raw_ax, raw_ay, raw_az);
+	ESP_LOGI("TAG", "Raw Gyro: %d, %d, %d", raw_gx, raw_gy, raw_gz);
 
 	data->accel_x = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
 	data->accel_y = ((float)raw_ay / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
