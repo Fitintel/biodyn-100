@@ -41,6 +41,9 @@
 #define MAG_ZOUT_H EXT_SLV_SENS_DATA_04
 #define MAG_ZOUT_L EXT_SLV_SENS_DATA_05
 
+#define FIFO_RST 0x68
+#define FIFO_MODE 0x69
+
 // Register bank 1
 #define SELF_TEST_X_GYRO 0x02
 #define SELF_TEST_Y_GYRO 0x03

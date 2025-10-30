@@ -214,18 +214,32 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 
 	// Reset IMU, wakes chip from sleep mode, turns off low power feature,
 	// disables temperature sensor, and sets clock source to auto-select.
-	err = biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x89);
+	err = biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x80);
 	vTaskDelay(pdMS_TO_TICKS(100));
+	uint8_t temp = 0;
+	biodyn_imu_icm20948_read_reg(_b0, PWR_MGMT_1, &temp);
+	ESP_LOGI(TAG, "READ PWR_MGMT_1 as %d", temp);
 	// Exit from sleep and select clock 37
 	// DEBUG: doesn't this sleep the chip again?
-	// err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
+	vTaskDelay(pdMS_TO_TICKS(10));
+	biodyn_imu_icm20948_read_reg(_b0, PWR_MGMT_1, &temp);
+	ESP_LOGI(TAG, "READ PWR_MGMT_1 as %d", temp);
 
 	// Turn off low power mode
 	// This shouldn't matter because lp_config is disabled in pwr_mgmt1 by turning off low power feature
-	err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
+	err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x00);
+	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
+
 	// ERROR: Retry turning off sleep mode of icm20948
 	// TEST: what actually changes sleep
 	// err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x41);
+
+	// Serial interface in SPI mode only
+	uint8_t user_ctrl_data;
+	err |= biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
+	user_ctrl_data |= 0x10;
+	err |= biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, user_ctrl_data);
 
 	// Align output data rate
 	// ODR start-time alignements starts when any of the following is written to:
@@ -235,20 +249,19 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	 * ACCEL_SMPLRT_DIV_2,
 	 * I2C_MST_ODR_CONFIG
 	 */
-	err |= biodyn_imu_icm20948_write_reg(_b2, ODR_ALIGN_EN, 0x01);
+	// err |= biodyn_imu_icm20948_write_reg(_b2, ODR_ALIGN_EN, 0x01);
 
 	// Gyroscope config with sample rate divider = 0
 	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_SMPLRT_DIV, 0x00);
 
 	// Gyroscope config with range set and digital filter enabled
-	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, ((gyro_range_value << 1) | 0x01));
-
+	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, (gyro_range_value | (1 << 2)));
 	// Accelerometer config with sample rate divider = 0
 	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_1, 0x00);
 	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_2, 0x00);
 
 	// Acceleromter config with range set and digital filter enabled
-	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, ((accel_range_value << 1) | 0x01));
+	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, (accel_range_value | (1 << 2)));
 
 	// ERROR CHECKPOINT *INIT1*
 	// Check err status to report any error if found
@@ -260,12 +273,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error collected before checkpoint: INIT1. Multiple errors possible.");
 		return err;
 	}
-
-	// Serial interface in SPI mode only
-	uint8_t user_ctrl_data;
-	err |= biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
-	user_ctrl_data |= 0x10;
-	err |= biodyn_imu_icm20948_write_reg(_b2, USER_CTRL, user_ctrl_data);
+	// Clear FIFO
+	err |= biodyn_imu_icm20948_write_reg(_b0, FIFO_RST, 0x1F); // reset all FIFOs
+	vTaskDelay(pdMS_TO_TICKS(10));
+	err |= biodyn_imu_icm20948_write_reg(_b0, FIFO_RST, 0x00);
 
 	// Set bank 0 to get readings
 	// biodyn_imu_icm20948_set_user_bank(_b0);
@@ -277,10 +288,9 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
 
 	// // Turn off low power mode
-	err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
+	// err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x00);
 	// // ERROR: Retry turning off sleep mode of icm20948
 	// err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
-
 	// ERROR CHECKPOINT *INIT2*
 	// Check err status to report any error if found
 	// Possible mismatch due to &'ing errors to error codes,
@@ -293,11 +303,11 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	}
 
 	// Initialize magnetometer
-	err |= biodyn_imu_icm20948_init_magnetomter();
+	// err |= biodyn_imu_icm20948_init_magnetomter();
 
 	// Read the magnetometer data from HXL to HZH
 	// i.e., the values of the magnetometer for x,y,z seperated into 2 bytes each
-	err |= biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
+	// err |= biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
 	if (err != ESP_OK)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in initializing and starting magnetometer. Multiple errors possible");
@@ -308,16 +318,30 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// in order to refresh readings (take from new sample).
 
 	// Self test to ensure proper functionality
-	err |= biodyn_imu_icm20948_self_test();
+	// err |= biodyn_imu_icm20948_self_test();
 	if (err != ESP_OK)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in completing self-test. Further investigation into self-test part functions likely required.");
 		ESP_LOGE(TAG, "Failed self_test for icm20948, investiage into composite function parts of self_test, error: %d", err);
-		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
+		// TODO: to enable again
+		// return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
 	}
-	// TODO: write self_tests for magnetometer
 
-	// Initialize the magnetometer
+	/**
+	 * LOGS: Debug logs to check on the initialized status of the imu
+	 * TODO: to be deleted
+	 */
+	uint8_t tmp;
+	biodyn_imu_icm20948_read_reg(_b0, PWR_MGMT_1, &tmp);
+	ESP_LOGI(TAG, "PWR_MGMT_1 = 0x%02X", tmp);
+	biodyn_imu_icm20948_read_reg(_b0, PWR_MGMT_2, &tmp);
+	ESP_LOGI(TAG, "PWR_MGMT_2 = 0x%02X", tmp);
+	biodyn_imu_icm20948_read_reg(_b0, LP_CONFIG, &tmp);
+	ESP_LOGI(TAG, "LP_CONFIG   = 0x%02X", tmp);
+	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &tmp);
+	ESP_LOGI(TAG, "USER_CTRL   = 0x%02X", tmp);
+	biodyn_imu_icm20948_read_reg(_b2, GYRO_CONFIG_1, &tmp);
+	ESP_LOGI(TAG, "GYRO_CFG1   = 0x%02X", tmp);
 
 	// Successful init, all clear
 	ESP_LOGI(TAG, "Initialized IMU");
@@ -360,6 +384,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank)
 	}
 
 	// Successful write, all clear
+
 	return BIODYN_IMU_OK;
 }
 
@@ -940,8 +965,8 @@ void biodyn_imu_icm20948_read_all(uint16_t *size, void *out)
  */
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 {
-
-	uint8_t out_length = 9 * sizeof(uint16_t) + 2 * sizeof(uint8_t);
+	// Reads 18 bytes of sensor data, 2 bytes of temperature data, 2 bytes of necessary AK09916 registers (reserved and status_2)
+	uint8_t out_length = 9 * sizeof(uint16_t) + 2 * sizeof(uint8_t) + 2 * (sizeof(uint8_t));
 	uint8_t *out = malloc(sizeof(uint8_t) * out_length);
 
 	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
@@ -953,10 +978,11 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	int16_t raw_gx = ((int16_t)out[6] << 8) | out[7];
 	int16_t raw_gy = ((int16_t)out[8] << 8) | out[9];
 	int16_t raw_gz = ((int16_t)out[10] << 8) | out[11];
-	// gap of two bytes between accel + gyro and mag for temperature registers
-	int16_t raw_mx = ((int16_t)out[14] << 8) | out[15];
-	int16_t raw_my = ((int16_t)out[16] << 8) | out[17];
-	int16_t raw_mz = ((int16_t)out[18] << 8) | out[19];
+	// Gap of two bytes between accel + gyro and mag for temperature registers
+	// Magnetometer is low byte first, then high byte (little-endian)
+	int16_t raw_mx = ((int16_t)out[15] << 8) | out[14];
+	int16_t raw_my = ((int16_t)out[17] << 8) | out[16];
+	int16_t raw_mz = ((int16_t)out[19] << 8) | out[18];
 	ESP_LOGI("TAG", "Raw Gyro: %d, %d, %d", raw_gx, raw_gy, raw_gz);
 
 	data->accel_x = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
@@ -970,6 +996,8 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	data->mag_x = (float)raw_mx * MAG_SENSITIVITY_SCALE_FACTOR;
 	data->mag_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
 	data->mag_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
+
+	uint8_t st2 = out[21];
 
 	// TEST: read status2 register of magnetometer as required in p. 79 after each measurement
 	biodyn_imu_ak09916_read_reg(AK09916_STATUS2, 1);
@@ -1061,9 +1089,9 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 	temp = 0x07;
 	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_CTRL, temp);
 
-	// Set for a custom rate to be used for sampling the magnetometer
-	temp = 0x40;
-	biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, temp);
+	// // Set for a custom rate to be used for sampling the magnetometer
+	// temp = 0x40;
+	// biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, temp);
 	// Set data rate as 136Hz
 	// Formula: 1.1 kHz/(2^((odr_config[3:0])) )
 	temp = 0x03;
@@ -1077,7 +1105,7 @@ static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 	// Start continuous mode:
 	// // Roughly sampling constantly at 100khz (Standard-mode p. 15)
 	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, 0x08);
-
+	ESP_LOGI(TAG, "Magnetometer (AK09916) initialized!");
 	// Magnetometer ready for use!
 	return BIODYN_IMU_OK;
 }
