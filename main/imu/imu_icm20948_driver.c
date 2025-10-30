@@ -241,6 +241,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	user_ctrl_data |= 0x10;
 	err |= biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, user_ctrl_data);
 
+	// DEBUG TEST: RE-ENABLE I2C MASTER
+	uint8_t uc;
+	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &uc);
+	uc |= 0x20; // I2C_MST_EN
+	err |= biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, uc);
+
 	// Align output data rate
 	// ODR start-time alignements starts when any of the following is written to:
 	/**
@@ -303,11 +309,14 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	}
 
 	// Initialize magnetometer
-	// err |= biodyn_imu_icm20948_init_magnetomter();
+	err |= biodyn_imu_icm20948_init_magnetomter();
+	// Configure I2C Slave 0 for continuous burst read (p. 69-70, 78)
+	// WARNING: writing to I2C_SLV0_CTRL breaks burst read, and disables proper reading for magnetometer
+	err |= biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x80 | AK09916_ADDRESS); // Read from AK09916
+	err |= biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, AK09916_HXL);			  // Start at HXL
+	err |= biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | 0x08);			  // Enable + 8 bytes
+	vTaskDelay(pdMS_TO_TICKS(10));
 
-	// Read the magnetometer data from HXL to HZH
-	// i.e., the values of the magnetometer for x,y,z seperated into 2 bytes each
-	// err |= biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
 	if (err != ESP_OK)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in initializing and starting magnetometer. Multiple errors possible");
@@ -318,7 +327,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// in order to refresh readings (take from new sample).
 
 	// Self test to ensure proper functionality
-	// err |= biodyn_imu_icm20948_self_test();
+	err |= biodyn_imu_icm20948_self_test();
 	if (err != ESP_OK)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in completing self-test. Further investigation into self-test part functions likely required.");
@@ -780,25 +789,60 @@ static biodyn_imu_err_t self_test_mag()
 {
 	// Start self-test on ak09916
 	// Read CNTL_2 to adjust for self-test
-	biodyn_imu_ak09916_read_reg(AK09916_CONTROL2, 1);
+	biodyn_imu_ak09916_read_reg(AK09916_CONTROL2, 0x10);
+	vTaskDelay(pdMS_TO_TICKS(1));
+
+	// Trigger a single read by reading STATUS1 to get data ready (DRDY)
+	biodyn_imu_ak09916_read_reg(AK09916_STATUS1, 1);
 
 	// Read output from external slave sensor data on icm20948
 	uint8_t temp;
 	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &temp);
 
-	// Or with self-test mode
-	temp |= 0b10000;
-	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, temp);
-
-	// Now in self-test mode, check response
-	// Check by checking DRDY (data ready) from status1
-
-	biodyn_imu_ak09916_read_reg(AK09916_STATUS1, 1);
-	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &temp);
-	if (temp & 0b11111111)
+	if (temp & 0x01)
+	{
 		return BIODYN_IMU_OK;
+		// Read all 8 bytes of mag data (optional, for validation) ---
+		uint8_t mag_data[8];
+		biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
+
+		// Wait for data to appear in ICM buffer
+		vTaskDelay(pdMS_TO_TICKS(1));
+
+		// Read from ICM-20948 slave buffer
+		for (int i = 0; i < 8; i++)
+		{
+			biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00 + i, &mag_data[i]);
+		}
+
+		// Check that data is non-zero (self-test field active) ---
+		bool non_zero = false;
+		for (int i = 0; i < 6; i++)
+		{
+			if (mag_data[i] != 0)
+			{
+				non_zero = true;
+				break;
+			}
+		}
+
+		if (!non_zero)
+		{
+			ESP_LOGE(TAG, "SELF_TEST_MAG: All mag bytes zero in self-test");
+		}
+
+		ESP_LOGI(TAG, "SELF_TEST_MAG: Passed (non-zero response)");
+		// Exit self-test mode
+		biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, 0x08); // Continuous mode 4 (100 Hz)
+		vTaskDelay(pdMS_TO_TICKS(1));
+	}
 	ESP_LOGE(TAG, "SELF_TEST_MAG: Failed self-test with read value test actual: %x, expected: non-zero", temp);
 	biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_MAG: Failed self-test");
+
+	// Exit self-test mode
+	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, 0x08); // Continuous mode 4 (100 Hz)
+	vTaskDelay(pdMS_TO_TICKS(1));
+
 	return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 }
 
@@ -905,6 +949,7 @@ void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out)
 	free(read_out);
 }
 
+// TODO: FIX MAG WITH NO DEBUG FIXES LIKE ST 2
 /**
  * Reads the magnetometer data of the IMU with bluetooth compatability
  * Returns the converted, scaled, and signed output that is then converted into a binary stream for external (pointer)
@@ -915,27 +960,15 @@ void biodyn_imu_icm20948_read_gyro(uint16_t *size, void *out)
  */
 void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out)
 {
-	uint8_t read_out_length = 6;
-	uint8_t *read_out = malloc(sizeof(uint8_t) * read_out_length);
-
-	biodyn_imu_icm20948_multibyte_read_reg(_b0, MAG_XOUT_H, read_out, read_out_length);
-
-	// Byte shifting for full high and low register with proper endianness
-	int16_t raw_ax = (int16_t)((read_out[0] << 8) | read_out[1]);
-	int16_t raw_ay = (int16_t)((read_out[2] << 8) | read_out[3]);
-	int16_t raw_az = (int16_t)((read_out[4] << 8) | read_out[5]);
+	// Cannot break burst mode, therefore read from I2C cycle
+	imu_motion_data imd;
+	biodyn_imu_icm20948_read_accel_gyro_mag(&imd);
 
 	float *fout = (float *)out;
 	*size = 3 * sizeof(float);
-	fout[0] = ((float)raw_ax * MAG_SENSITIVITY_SCALE_FACTOR);
-	fout[1] = ((float)raw_ay * MAG_SENSITIVITY_SCALE_FACTOR);
-	fout[2] = ((float)raw_az * MAG_SENSITIVITY_SCALE_FACTOR);
-
-	// TEST: read status2 register of magnetometer as required in p. 79 after each measurement
-	biodyn_imu_ak09916_read_reg(AK09916_STATUS2, 1);
-
-	// ESP_LOGI(TAG, "accel factor should be 16384 was %d", accel_sensitivity_scale_factor);
-	free(read_out);
+	fout[0] = imd.mag_x;
+	fout[1] = imd.mag_y;
+	fout[2] = imd.mag_z;
 }
 
 /**
@@ -965,9 +998,10 @@ void biodyn_imu_icm20948_read_all(uint16_t *size, void *out)
  */
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 {
-	// Reads 18 bytes of sensor data, 2 bytes of temperature data, 2 bytes of necessary AK09916 registers (reserved and status_2)
-	uint8_t out_length = 9 * sizeof(uint16_t) + 2 * sizeof(uint8_t) + 2 * (sizeof(uint8_t));
-	uint8_t *out = malloc(sizeof(uint8_t) * out_length);
+	// 6(accel) + 2(temp) + 6(gyro) + 8(mag: HXL..ST2)
+	uint8_t out_length = 22;
+	// uint8_t *out = malloc(sizeof(uint8_t) * out_length);
+	uint8_t out[22];
 
 	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
 
@@ -983,7 +1017,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	int16_t raw_mx = ((int16_t)out[15] << 8) | out[14];
 	int16_t raw_my = ((int16_t)out[17] << 8) | out[16];
 	int16_t raw_mz = ((int16_t)out[19] << 8) | out[18];
-	ESP_LOGI("TAG", "Raw Gyro: %d, %d, %d", raw_gx, raw_gy, raw_gz);
+	// ESP_LOGI("TAG", "Raw Gyro: %d, %d, %d", raw_gx, raw_gy, raw_gz);
 
 	data->accel_x = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
 	data->accel_y = ((float)raw_ay / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
@@ -998,11 +1032,14 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	data->mag_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
 
 	uint8_t st2 = out[21];
+	if (st2 & 0x08)
+	{
+		ESP_LOGI(TAG, "Mag overflow detected!");
+	}
+	// DEBUG:
+	ESP_LOGI(TAG, "Raw Mag: %d, %d, %d | ST2: 0x%02X", raw_mx, raw_my, raw_mz, st2);
 
-	// TEST: read status2 register of magnetometer as required in p. 79 after each measurement
-	biodyn_imu_ak09916_read_reg(AK09916_STATUS2, 1);
-
-	free(out);
+	// free(out);
 	return BIODYN_IMU_OK;
 }
 
