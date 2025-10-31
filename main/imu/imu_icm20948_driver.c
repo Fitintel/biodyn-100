@@ -288,15 +288,15 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 
 	// Read the magnetometer data from HXL to HZH
 	// i.e., the values of the magnetometer for x,y,z seperated into 2 bytes each
-	err |= biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
-	if (err != ESP_OK)
-	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in initializing and starting magnetometer. Multiple errors possible");
-		ESP_LOGE(TAG, "Failed to initialize and start AK09916 (magnetometer) device, error %d", err);
-		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
-	}
-	// 8 (not 6) byte read necessary: must sample the status and control register
-	// in order to refresh readings (take from new sample).
+	// err |= biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
+	// if (err != ESP_OK)
+	// {
+	// 	biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in initializing and starting magnetometer. Multiple errors possible");
+	// 	ESP_LOGE(TAG, "Failed to initialize and start AK09916 (magnetometer) device, error %d", err);
+	// 	return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
+	// }
+	// // 8 (not 6) byte read necessary: must sample the status and control register
+	// // in order to refresh readings (take from new sample).
 
 	// Self test to ensure proper functionality
 	err |= biodyn_imu_icm20948_self_test();
@@ -864,11 +864,11 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	// }
 
 	// Run mag self-test
-	if ((err = self_test_mag()))
-	{
-		ESP_LOGE(TAG, "Self test failed - mag (%x)", err);
-		return err;
-	}
+	// if ((err = self_test_mag()))
+	// {
+	// 	ESP_LOGE(TAG, "Self test failed - mag (%x)", err);
+	// 	return err;
+	// }
 
 	return BIODYN_IMU_OK;
 }
@@ -994,9 +994,8 @@ void biodyn_imu_icm20948_read_all(uint16_t *size, void *out)
  */
 biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 {
-
 	uint8_t out_length = 9 * sizeof(uint16_t) + 2 * sizeof(uint8_t);
-	uint8_t *out = malloc(sizeof(uint8_t) * out_length);
+	uint8_t out[32];
 
 	biodyn_imu_icm20948_multibyte_read_reg(_b0, ACCEL_XOUT_H, out, out_length);
 
@@ -1012,6 +1011,8 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	int16_t raw_my = ((uint16_t)out[17] << 8) | out[16];
 	int16_t raw_mz = ((uint16_t)out[19] << 8) | out[18];
 	// ESP_LOGI("TAG", "Raw Accel: %d, %d, %d", raw_ax, raw_ay, raw_az);
+	// ESP_LOGI("TAG", "Raw gyro: %d, %d, %d", raw_gx, raw_gy, raw_gz);
+	// ESP_LOGI(TAG, "Sens factor %f", gyro_sensitivity_scale_factor);
 
 	data->accel_x = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
 	data->accel_y = ((float)raw_ay / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
@@ -1021,14 +1022,13 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	data->gyro_y = (float)raw_gy / gyro_sensitivity_scale_factor;
 	data->gyro_z = (float)raw_gz / gyro_sensitivity_scale_factor;
 
-	data->gyro_x = (float)raw_mx * MAG_SENSITIVITY_SCALE_FACTOR;
-	data->gyro_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
-	data->gyro_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->mag_x = (float)raw_mx * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->mag_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->mag_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
 
 	// TEST: read status2 register of magnetometer as required in p. 79 after each measurement
-	biodyn_imu_ak09916_read_reg(AK09916_STATUS2, 1);
+	// biodyn_imu_ak09916_read_reg(AK09916_STATUS2, 1);
 
-	free(out);
 	return BIODYN_IMU_OK;
 }
 
