@@ -16,6 +16,16 @@ static uint8_t gyro_range_value = _gyro_1000dps;
 static uint16_t accel_sensitivity_scale_factor = 0;
 static float gyro_sensitivity_scale_factor = -1;
 
+// Checks and returns IMU error provided by expr
+#define IMU_ERR_CHECK(expr)                         \
+	{                                               \
+		biodyn_imu_err_t __imuerror;                \
+		if ((__imuerror = (expr)) != BIODYN_IMU_OK) \
+		{                                           \
+			return __imuerror;                      \
+		}                                           \
+	}
+
 // TODO reorganize with config
 #define MAG_SENSITIVITY_SCALE_FACTOR 4900 / (1 << 14)
 
@@ -50,141 +60,39 @@ uint8_t biodyn_imu_icm20948_error_index = 0;
 // TODO: add/remove necessary function prototypes with reorganization
 
 // Sets the user bank of registers
-static biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank);
+static biodyn_imu_err_t set_user_bank(uint8_t bank);
 // Reads the user bank of registers
-static biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out);
+static biodyn_imu_err_t get_user_bank(uint8_t *bank_out);
 // Writes data to a single register specified by a bank and address to the IMU
-static biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data);
+static biodyn_imu_err_t write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data);
 // Reads data of a single register specified by a bank and address of the IMU
-static biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_address, uint8_t *out);
-// Initializes magnetometer (AK09916)
-static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter();
+static biodyn_imu_err_t read_reg(uint8_t bank, uint16_t register_address, uint8_t *out);
 // Write a byte to the magnetometer attached to the IMU
 static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data);
 // Read multiple bytes from the magnetometer attached to the IMU
 static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t reg, uint8_t len);
-// Adds an error returned by the IMU to it's subsystem
-static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *optional_attached_message);
+// Self-tests the whoami
+biodyn_imu_err_t self_test_whoami();
+// Collect IMU errors
+biodyn_imu_err_t collect_err(biodyn_imu_err_t error, char *optional_attached_message);
 
-// Adds errors to the IMU driver's subsystem error collection. A complete list of biodyn IMU errors can be found below and in imu_icm20948_driver.h
-// For internal (nested) function calls of the driver's own functions, it is not necessary to manually add the error return (duplicate).
-/**
- * BIODYN_IMU_OK 0
- * BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS 0x1
- * BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV 0x2
- * BIODYN_IMU_ERR_COULDNT_SEND_DATA 0x4
- * BIODYN_IMU_ERR_WRONG_WHOAMI 0x8
- * BIODYN_IMU_ERR_COULDNT_CONFIGURE 0x10
- * BIODYN_IMU_ERR_COULDNT_READ 0x20
- * BIODYN_IMU_ERR_INVALID_ARGUMENT 0x5
- */
-static void biodyn_imu_icm20948_add_error_to_subsystem(uint8_t error, char *optional_attached_message)
-{
-	biodyn_imu_icm20948_in_error = true;
-	char error_msg[128]; // Enough space for message + suffix
-
-	switch (error)
-	{
-	case BIODYN_IMU_OK:
-		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_OK");
-		break;
-	case BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS:
-		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_INIT_SPI_BUS");
-		break;
-	case BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV:
-		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_INIT_SPI_DEV");
-		break;
-	case BIODYN_IMU_ERR_COULDNT_SEND_DATA:
-		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_SEND_DATA");
-		break;
-	case BIODYN_IMU_ERR_WRONG_WHOAMI:
-		snprintf(error_msg, sizeof(error_msg), "IMU_WRONG_WHOAMI");
-		break;
-	case BIODYN_IMU_ERR_COULDNT_CONFIGURE:
-		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_CONFIGURE");
-		break;
-	case BIODYN_IMU_ERR_COULDNT_READ:
-		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_READ");
-		break;
-	case BIODYN_IMU_ERR_INVALID_ARGUMENT:
-		snprintf(error_msg, sizeof(error_msg), "IMU_INVALID_ARGUMENT");
-		break;
-	default:
-		// Assume it is an esp error then,
-		// This esp method from esp_err.h also handles unknown errors for us
-		// Only overlap is BIODYN_IMU_OK and ESP_OK, therefore sufficient
-		snprintf(error_msg, sizeof(error_msg), "%s", esp_err_to_name(error));
-		break;
-	}
-
-	strncat(error_msg, "\n", sizeof(error_msg) - strlen(error_msg) - 1);
-
-	if (optional_attached_message != NULL)
-	{
-		strncat(error_msg, optional_attached_message, sizeof(error_msg) - strlen(error_msg) - 1);
-	}
-	strncpy(biodyn_imu_icm20948_errors[biodyn_imu_icm20948_error_index],
-			error_msg,
-			sizeof(biodyn_imu_icm20948_errors[biodyn_imu_icm20948_error_index]) - 1);
-
-	biodyn_imu_icm20948_error_index = (biodyn_imu_icm20948_error_index + 1) % 3;
-	return;
-}
-
-// Tests register reading capability
-biodyn_imu_err_t biodyn_imu_icm20948_read_register_test(uint8_t bank, uint16_t register_address, uint8_t *out)
-{
-	// Ensure valid pointer
-	if (!out)
-	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "READ_REGISTER_TEST: invalid out pointer");
-		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
-	}
-
-	// Identify user bank before selecting register details
-	biodyn_imu_icm20948_set_user_bank(bank);
-	// Send user inputted register addres with MSB as the read bit (1)
-	uint8_t tx_data[2] = {register_address | READ_MSB, 0x00};
-	// Empty receiving byte array
-	uint8_t rx_data[2] = {0};
-
-	// length 2 (bytes) = max{rx_data length, tx_data length}
-	spi_transaction_t trans = {
-		.length = 8 * 2,
-		.tx_buffer = tx_data,
-		.rx_buffer = rx_data,
-	};
-
-	// SPI TRANSACTION
-	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
-	if (err != ESP_OK)
-	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "READ_REGISTER_TEST: failed spi transaction");
-		return err;
-	}
-
-	// rx_data[1] contains read  and rx[0] is dummy garbage
-	*out = rx_data[1];
-
-	// Successful write, all clear
-	return BIODYN_IMU_OK;
-}
-
-// Initializes the IMU
-biodyn_imu_err_t biodyn_imu_icm20948_init()
+// Initializes the SPI bus
+biodyn_imu_err_t init_spi()
 {
 	// Create bus config
 	spi_bus_config_t bus_config = {
 		.miso_io_num = imu_data.i2c.miso,
 		.mosi_io_num = imu_data.i2c.mosi,
 		.sclk_io_num = imu_data.i2c.sclk,
+		.quadwp_io_num = -1,
+		.quadhd_io_num = -1,
 	};
 
 	// Initialize bus
 	esp_err_t err = spi_bus_initialize(SPI2_HOST, &bus_config, SPI_DMA_CH_AUTO);
 	if (err != ESP_OK)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "SPI_BUS_INITIALIZE: failed spi bus initialization");
+		collect_err(err, "SPI_BUS_INITIALIZE: failed spi bus initialization");
 		ESP_LOGE(TAG, "Failed to initialize SPI bus, error %d", err);
 		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS;
 	}
@@ -192,128 +100,122 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// Initialize interface
 	spi_device_interface_config_t spi_dev_config = {
 		.clock_speed_hz = 1000 * 1000, // 1 MHz
-		.mode = 0,					   // CPOL is high and CPHA is is rising edge sampling,
-									   // compatible with mode 0 and mode 3
+		.mode = 0,					   // Compatible with mode 0 and mode 3
 		.spics_io_num = imu_data.i2c.cs,
 		.queue_size = 7, // amount of queueable requested SPI transactions.
 	};
 	err = spi_bus_add_device(SPI2_HOST, &spi_dev_config, &imu_data.handle);
 	if (err != ESP_OK)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "SPI_BUS_INITIALIZE: failed spi bus initialization");
+		collect_err(err, "SPI_BUS_INITIALIZE: failed spi bus initialization");
 		ESP_LOGE(TAG, "Failed to initialize SPI device, error %d", err);
 		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
 	}
 
-	// INITIALIZATION PROCEDURE
+	return BIODYN_IMU_OK;
+}
+
+// Wake IMU and perform basic configuration
+biodyn_imu_err_t wake_imu()
+{
+	// Reset chip
+	IMU_ERR_CHECK(write_reg(_b0, PWR_MGMT_1, 0x80));
+
+	// Wait for reset
+	vTaskDelay(pdMS_TO_TICKS(100));
+
+	// Check chip WHOAMI
+	IMU_ERR_CHECK(self_test_whoami());
+
+	// Select best available clock (CLKSEL = 1) and turn sleep off
+	IMU_ERR_CHECK(write_reg(_b0, PWR_MGMT_1, 0x01));
+
+	// Enable accel and gyro
+	IMU_ERR_CHECK(write_reg(_b0, PWR_MGMT_2, 0x00));
+
+	// Disable all low power (duty cycling) modes for accel, gyro, mag
+	IMU_ERR_CHECK(write_reg(_b0, LP_CONFIG, 0x00));
+
+	return BIODYN_IMU_OK;
+}
+
+// Sets IMU to SPI-only mode and configures the internal I2C for magnetometer
+biodyn_imu_err_t imu_config_i2c()
+{
+	// SPI-only and turn on internal I2C master
+	uint8_t uc = 0;
+	IMU_ERR_CHECK(read_reg(_b0, USER_CTRL, &uc));
+	uc |= 1 << 5; // I2C_MST_EN = 1 -> enable internal I2C for mag
+	uc |= 1 << 4; // I2C_IF_DIS = 1 -> put in SPI-only mode
+	IMU_ERR_CHECK(write_reg(_b0, USER_CTRL, uc));
+
+	// Disable I2C access of mag from external chips
+	IMU_ERR_CHECK(write_reg(_b0, INT_PIN_CFG, 0x00));
+
+	// Single-master mode and 345 kHz internal I2C clock
+	IMU_ERR_CHECK(write_reg(_b3, I2C_MST_CTRL, 0x07));
+
+	// Align I2C mag reads with the timing of accel,gyro reads so our data
+	// has consistent timing.
+	// We do not need I2C_MST_DELAY_CTRL or I2C_MST_DELAY_CTRL.
+	IMU_ERR_CHECK(write_reg(_b2, ODR_ALIGN_EN, 0x01));
+
+	return BIODYN_IMU_OK;
+}
+
+// Configures the magnetometer
+biodyn_imu_err_t init_mag()
+{
+	// First step is to verify the WHOAMI for the mag
+	// -> We are reading the AK09916
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV0_ADDR, AK09916_ADDRESS | AK09916_READ));
+	// -> We are reading the WHOAMI reg on the mag
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV0_REG, AK09916_WHOAMI));
+	// -> Enable reading and read one byte (data in EXT_SENS_DATA_00 for SLV0)
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV0_CTRL, 0x81));
+	// -> Wait for read
+	vTaskDelay(pdMS_TO_TICKS(20));
+	// -> Read external sensor data (mag)
+	uint8_t mag_whoami = 0;
+	IMU_ERR_CHECK(read_reg(_b0, EXT_SLV_SENS_DATA_00, &mag_whoami));
+	// Check if this is what we expect
+	if (mag_whoami != 0x09)
+	{
+		ESP_LOGE(TAG, "Wrong magnetometer WHOAMI: 0x%02x", mag_whoami);
+		return collect_err(BIODYN_IMU_ERR_WRONG_WHOAMI, "Incorrect magnetometer WHOAMI");
+	}
+
+	// Second step is to enable continuous reading
+	// -> Set starting reg address for next op to CNTL2 register
+	// IMU_ERROR_CHECK(write_reg(_b3, I2C_SLV0_REG, AK09916_CONTROL2));
+
+	return BIODYN_IMU_OK;
+}
+
+// Initializes the IMU
+biodyn_imu_err_t biodyn_imu_icm20948_init()
+{
+	// Initialize SPI
+	IMU_ERR_CHECK(init_spi());
+	ESP_LOGI(TAG, "\tSPI initialized");
+
+	// Wake up the IMU
+	IMU_ERR_CHECK(wake_imu());
+	ESP_LOGI(TAG, "\tIMU woke up");
+
+	// Configure SPI mode and imu internal I2C
+	IMU_ERR_CHECK(imu_config_i2c());
+	ESP_LOGI(TAG, "\tConfigured IMU I2C and SPI");
+
+	// Init magnetometer
+	IMU_ERR_CHECK(init_mag());
+	ESP_LOGI(TAG, "\tInitialized magnetometer");
 
 	// Initialize configuration data
 	accel_sensitivity_scale_factor = (1 << (uint16_t)(14 - accel_range_value));
 	gyro_sensitivity_scale_factor = 16.4 * (1 << (3 - gyro_range_value));
 	ESP_LOGI(TAG, "\tPlanar sensitivity factor: %d", accel_sensitivity_scale_factor);
 	ESP_LOGI(TAG, "\tGyro sensitivity factor: %f", gyro_sensitivity_scale_factor);
-
-	// Reset IMU
-	// Start error collection,
-	err = biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x81);
-
-	// Exit from sleep and select clock 37
-	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
-
-	// Turn off low power mode
-	err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
-	// ERROR: Retry turning off sleep mode of icm20948
-	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
-
-	// Align output data rate
-	err |= biodyn_imu_icm20948_write_reg(_b2, ODR_ALIGN_EN, 0x00);
-
-	// Gyroscope config with sample rate divider = 0
-	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_SMPLRT_DIV, 0x00);
-
-	// Gyroscope config with range set and digital filter enabled
-	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, ((gyro_range_value << 1) | 0x01));
-
-	// Accelerometer config with sample rate divider = 0
-	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_1, 0x00);
-	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_2, 0x00);
-
-	// Acceleromter config with range set and digital filter enabled
-	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, ((accel_range_value << 1) | 0x01));
-
-	// ERROR CHECKPOINT *INIT1*
-	// Check err status to report any error if found
-	// Possible mismatch due to &'ing errors to error codes,
-	// Resolved only upon further scrutiny?
-	// Due to low occurence over tested code, this is ok? TODO
-	if (err != BIODYN_IMU_OK)
-	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error collected before checkpoint: INIT1. Multiple errors possible.");
-		return err;
-	}
-
-	// Serial interface in SPI mode only
-	uint8_t user_ctrl_data;
-	err |= biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
-	user_ctrl_data |= 0x10;
-	err |= biodyn_imu_icm20948_write_reg(_b2, USER_CTRL, user_ctrl_data);
-
-	// Set bank 0 to get readings
-	// biodyn_imu_icm20948_set_user_bank(_b0);
-
-	// Delay to wait for power up
-	vTaskDelay(pdMS_TO_TICKS(100));
-
-	// Wake up all sensors
-	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
-
-	// Turn off low power mode
-	err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x40);
-	// ERROR: Retry turning off sleep mode of icm20948
-	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
-
-	// ERROR CHECKPOINT *INIT2*
-	// Check err status to report any error if found
-	// Possible mismatch due to &'ing errors to error codes,
-	// Resolved only upon further scrutiny?
-	// Due to low occurence over tested code, this is ok? TODO
-	if (err != BIODYN_IMU_OK)
-	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error collected before checkpoint: INIT2. Multiple errors possible.");
-		return err;
-	}
-
-	// Initialize magnetometer
-	// err |= biodyn_imu_icm20948_init_magnetomter();
-
-	// Read the magnetometer data from HXL to HZH
-	// i.e., the values of the magnetometer for x,y,z seperated into 2 bytes each
-	// err |= biodyn_imu_ak09916_read_reg(AK09916_HXL, 8);
-	// if (err != ESP_OK)
-	// {
-	// 	biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in initializing and starting magnetometer. Multiple errors possible");
-	// 	ESP_LOGE(TAG, "Failed to initialize and start AK09916 (magnetometer) device, error %d", err);
-	// 	return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
-	// }
-	// // 8 (not 6) byte read necessary: must sample the status and control register
-	// // in order to refresh readings (take from new sample).
-
-	// Self test to ensure proper functionality
-	err |= biodyn_imu_icm20948_self_test();
-	if (err != ESP_OK)
-	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in completing self-test. Further investigation into self-test part functions likely required.");
-		ESP_LOGE(TAG, "Failed self_test for icm20948, investiage into composite function parts of self_test, error: %d", err);
-		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
-	}
-	// TODO: write self_tests for magnetometer
-
-	// Initialize the magnetometer
-
-	// Successful init, all clear
-	uint8_t out;
-	biodyn_imu_icm20948_read_register_test(_b0, USER_CTRL, &out);
-	ESP_LOGI(TAG, "IMU USER_CTRL register: %x", out);
 
 	ESP_LOGI(TAG, "Initialized IMU");
 
@@ -323,14 +225,14 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 /** Sets the user bank to @param bank
  * 	Range of [0, 3]
  */
-biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank)
+biodyn_imu_err_t set_user_bank(uint8_t bank)
 {
 	// Check if bank is valid: range of [0, 3]
 	if (bank > _b3)
 	{
 		char error_msg[100];
 		sprintf(error_msg, "SET_USER_BANK: invalid argument %d for parameter *bank*", bank);
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, error_msg);
+		collect_err(BIODYN_IMU_ERR_INVALID_ARGUMENT, error_msg);
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
 	}
 
@@ -350,7 +252,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank)
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "SET_USER_BANK: Failed SPI transaction");
+		collect_err(err, "SET_USER_BANK: Failed SPI transaction");
 		ESP_LOGE(TAG, "Failed to transmit data over SPI (selecting_user_bank function with bank value %d)", bank);
 		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
 	}
@@ -362,12 +264,12 @@ biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank)
 /** Gets the user bank, with output at @param bank_out
  * 	Range of [0, 3]
  */
-biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out)
+biodyn_imu_err_t get_user_bank(uint8_t *bank_out)
 {
 	// Pointer must be valid
 	if (!bank_out)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "GET_USER_BANK: null pointing argument *bank_out*");
+		collect_err(BIODYN_IMU_ERR_INVALID_ARGUMENT, "GET_USER_BANK: null pointing argument *bank_out*");
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
 	}
 	// Send address of bank with MSB as the read bit (1)
@@ -386,7 +288,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out)
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "GET_USER_BANK: Failed SPI transaction");
+		collect_err(BIODYN_IMU_ERR_INVALID_ARGUMENT, "GET_USER_BANK: Failed SPI transaction");
 		return err;
 	}
 
@@ -404,16 +306,16 @@ biodyn_imu_err_t biodyn_imu_icm20948_get_user_bank(uint8_t *bank_out)
  * @param register_address the local address of the register within the bank
  * @param out the output stored read result from the icm20948
  */
-biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_address, uint8_t *out)
+biodyn_imu_err_t read_reg(uint8_t bank, uint16_t register_address, uint8_t *out)
 {
 	// Ensure valid pointer
 	if (!out)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "READ_REG: null pointing argument *out*");
+		collect_err(BIODYN_IMU_ERR_INVALID_ARGUMENT, "READ_REG: null pointing argument *out*");
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
 	}
 	// Identify user bank before selecting register details
-	biodyn_imu_icm20948_set_user_bank(bank);
+	set_user_bank(bank);
 	// Send user inputted register addres with MSB as the read bit (1)
 	uint8_t tx_data[2] = {register_address | READ_MSB, 0x00};
 	// Empty receiving byte array
@@ -430,7 +332,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_reg(uint8_t bank, uint16_t register_ad
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "READ_REG: Failed SPI transaction");
+		collect_err(BIODYN_IMU_ERR_INVALID_ARGUMENT, "READ_REG: Failed SPI transaction");
 		return err;
 	}
 
@@ -452,10 +354,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(uint8_t bank, uint16_t r
 	// Invalid pointer throws an error
 	if (!out || length == 0)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "MULTIBYTE_READ_REG: argument for parameter *out* must be non-zero");
+		collect_err(BIODYN_IMU_ERR_INVALID_ARGUMENT, "MULTIBYTE_READ_REG: argument for parameter *out* must be non-zero");
 		return BIODYN_IMU_ERR_INVALID_ARGUMENT;
 	}
-	biodyn_imu_icm20948_set_user_bank(bank);
+	set_user_bank(bank);
 	uint8_t *tx_data = malloc(sizeof(uint8_t) * (length + 1));
 	tx_data[0] = register_address | READ_MSB;
 	uint8_t *rx_data = malloc(sizeof(uint8_t) * (length + 1));
@@ -471,7 +373,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(uint8_t bank, uint16_t r
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "MULTIBYTE_READ_REG: Failed SPI transaction");
+		collect_err(BIODYN_IMU_ERR_INVALID_ARGUMENT, "MULTIBYTE_READ_REG: Failed SPI transaction");
 		free(tx_data);
 		free(rx_data);
 		return err;
@@ -492,10 +394,10 @@ biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(uint8_t bank, uint16_t r
  * @param register_address the local address of the register within the bank
  * @param write_data the data to write to the imu
  */
-biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data)
+biodyn_imu_err_t write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data)
 {
 	// Select user bank to write to
-	biodyn_imu_icm20948_set_user_bank(bank);
+	set_user_bank(bank);
 
 	// Use input register address OR with WRITE_MSB (0), with write data as second argument
 	uint8_t tx_data[2] = {register_address | WRITE_MSB, write_data};
@@ -510,7 +412,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_a
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
 	if (err != ESP_OK)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_INVALID_ARGUMENT, "WRITE_REG: Failed SPI transaction");
+		collect_err(BIODYN_IMU_ERR_INVALID_ARGUMENT, "WRITE_REG: Failed SPI transaction");
 		return err;
 	}
 
@@ -522,15 +424,15 @@ biodyn_imu_err_t biodyn_imu_icm20948_write_reg(uint8_t bank, uint16_t register_a
  * Self-test on the whoami of the IMU.
  * Checks the whoami register of the IMU which should always be readable.
  */
-static biodyn_imu_err_t self_test_whoami()
+biodyn_imu_err_t self_test_whoami()
 {
 	uint8_t whoami;
-	biodyn_imu_icm20948_read_reg(_b0, 0x00, &whoami);
+	read_reg(_b0, 0x00, &whoami);
 
 	if (whoami != 0xEA)
 	{
 		ESP_LOGE(TAG, "Got wrong WHOAMI response: %x", whoami);
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_WRONG_WHOAMI, "SELF_TEST_WHOAMI: Incorrect whoami response");
+		collect_err(BIODYN_IMU_ERR_WRONG_WHOAMI, "SELF_TEST_WHOAMI: Incorrect whoami response");
 		return BIODYN_IMU_ERR_WRONG_WHOAMI;
 	}
 
@@ -549,22 +451,22 @@ static biodyn_imu_err_t self_test_user_banks()
 
 	// Write non-zero
 	uint8_t write_bank_value = 2;
-	if ((err = biodyn_imu_icm20948_set_user_bank(write_bank_value)))
+	if ((err = set_user_bank(write_bank_value)))
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "SELF_TEST_USER_BANKS: Failed self-test");
+		collect_err(err, "SELF_TEST_USER_BANKS: Failed self-test");
 		return err;
 	}
 
 	// Verify written as non-zero
 	uint8_t initial_bank_value = 0;
-	if ((err = biodyn_imu_icm20948_get_user_bank(&initial_bank_value)))
+	if ((err = get_user_bank(&initial_bank_value)))
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "SELF_TEST_USER_BANKS: Failed self-test");
+		collect_err(err, "SELF_TEST_USER_BANKS: Failed self-test");
 		return err;
 	}
 	if (initial_bank_value != write_bank_value)
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_SEND_DATA, "SELF_TEST_USER_BANKS: Mismatch between written (expected) bank value and received (actual)");
+		collect_err(BIODYN_IMU_ERR_COULDNT_SEND_DATA, "SELF_TEST_USER_BANKS: Mismatch between written (expected) bank value and received (actual)");
 		ESP_LOGE(TAG, "Failed to write IMU user bank: Tried to write %d got %d",
 				 write_bank_value, initial_bank_value);
 		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
@@ -572,9 +474,9 @@ static biodyn_imu_err_t self_test_user_banks()
 
 	// Write 0 - restore default
 	write_bank_value = 0;
-	if ((err = biodyn_imu_icm20948_set_user_bank(write_bank_value)))
+	if ((err = set_user_bank(write_bank_value)))
 	{
-		biodyn_imu_icm20948_add_error_to_subsystem(err, "SELF_TEST_USER_BANKS: Failed self-test");
+		collect_err(err, "SELF_TEST_USER_BANKS: Failed self-test");
 		return err;
 	}
 	ESP_LOGI(TAG, "\tUser banks OK");
@@ -597,17 +499,17 @@ static biodyn_imu_err_t self_test_accel_gyro()
 
 	// ACCEL SELF_TEST START
 	uint8_t temp = 0;
-	biodyn_imu_icm20948_read_reg(_b2, ACCEL_CONFIG_2, &temp);
+	read_reg(_b2, ACCEL_CONFIG_2, &temp);
 	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
 	temp |= (0b111 << 5);
-	biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG_2, temp);
+	write_reg(_b2, ACCEL_CONFIG_2, temp);
 
 	// GYRO SELF_TEST START
 	temp = 0;
-	biodyn_imu_icm20948_read_reg(_b2, GYRO_CONFIG_2, &temp);
+	read_reg(_b2, GYRO_CONFIG_2, &temp);
 	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
 	temp |= (0b111 << 5);
-	biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_2, temp);
+	write_reg(_b2, GYRO_CONFIG_2, temp);
 	vTaskDelay(pdMS_TO_TICKS(50));
 
 	// Sensor output with self_test_enabled
@@ -630,12 +532,12 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	uint8_t trimgy = 0;
 	uint8_t trimgz = 0;
 
-	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_X_ACCEL, &trimax);
-	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_Y_ACCEL, &trimay);
-	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_Z_ACCEL, &trimaz);
-	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_X_GYRO, &trimgx);
-	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_Y_GYRO, &trimgy);
-	biodyn_imu_icm20948_read_reg(_b1, SELF_TEST_Z_GYRO, &trimgz);
+	read_reg(_b1, SELF_TEST_X_ACCEL, &trimax);
+	read_reg(_b1, SELF_TEST_Y_ACCEL, &trimay);
+	read_reg(_b1, SELF_TEST_Z_ACCEL, &trimaz);
+	read_reg(_b1, SELF_TEST_X_GYRO, &trimgx);
+	read_reg(_b1, SELF_TEST_Y_GYRO, &trimgy);
+	read_reg(_b1, SELF_TEST_Z_GYRO, &trimgz);
 
 	// Compare trims to with a range limiter to deltas
 	// Compare within magnitude by 50% range (might need to be adjusted)
@@ -659,7 +561,7 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	else
 	{
 		ESP_LOGE(TAG, "self test failed on delta ax with ax = %f and trimax = %d", deltas.accel_x, trimax);
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on ax");
+		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on ax");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
 	if (RL * trimay < deltas.accel_y / (1 << accel_range_value) && RH * trimay > deltas.accel_y / (1 << accel_range_value))
@@ -670,7 +572,7 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	{
 		ESP_LOGE(TAG, "self test failed on delta ay");
 
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on ay");
+		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on ay");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
 	if (RL * trimaz < deltas.accel_z / (1 << accel_range_value) && RH * trimaz > deltas.accel_z / (1 << accel_range_value))
@@ -680,7 +582,7 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	else
 	{
 		ESP_LOGE(TAG, "self test failed on delta az");
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on az");
+		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on az");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
 	if (RL * trimgx < deltas.gyro_x / (1 << gyro_range_value) && RH * trimgx > deltas.gyro_x / (1 << gyro_range_value))
@@ -693,7 +595,7 @@ static biodyn_imu_err_t self_test_accel_gyro()
 		uint8_t and2 = RH * trimgx > deltas.gyro_x / (1 << gyro_range_value);
 		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro_x, trimgx);
 		ESP_LOGE(TAG, "and1 = %d; and2 = %d", and1, and2);
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gx");
+		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gx");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
 	if (RL * trimgy < deltas.gyro_y / (1 << gyro_range_value) && RH * trimgy > deltas.gyro_y / (1 << gyro_range_value))
@@ -706,7 +608,7 @@ static biodyn_imu_err_t self_test_accel_gyro()
 		uint8_t and2 = RH * trimgy > deltas.gyro_y / (1 << gyro_range_value);
 		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro_y, trimgy);
 		ESP_LOGE(TAG, "and1 = %d; and2 = %d", and1, and2);
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gy");
+		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gy");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
 	if (RL * trimgz < deltas.gyro_z / (1 << gyro_range_value) && RH * trimgz > deltas.gyro_z / (1 << gyro_range_value))
@@ -720,7 +622,7 @@ static biodyn_imu_err_t self_test_accel_gyro()
 		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro_z, trimgy);
 		ESP_LOGE(TAG, "and1 = %d; and2 = %d", and1, and2);
 
-		biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gz");
+		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gz");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
 	ESP_LOGI(TAG, "Finished checking against trims");
@@ -728,17 +630,17 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	// Clear self_test bits
 	// ACCEL SELF_TEST END
 	temp = 0;
-	biodyn_imu_icm20948_read_reg(_b2, ACCEL_CONFIG_2, &temp);
+	read_reg(_b2, ACCEL_CONFIG_2, &temp);
 	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
 	temp &= ~(0b111 << 5);
-	biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG_2, temp);
+	write_reg(_b2, ACCEL_CONFIG_2, temp);
 
 	// GYRO SELF_TEST END
 	temp = 0;
-	biodyn_imu_icm20948_read_reg(_b2, GYRO_CONFIG_2, &temp);
+	read_reg(_b2, GYRO_CONFIG_2, &temp);
 	// [7:6] reserved, [5:3] xyz self-test enables, [2:0] accel sample decimator (see function ...accel_number_samples_averaged)
 	temp &= ~(0b111 << 5);
-	biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_2, temp);
+	write_reg(_b2, GYRO_CONFIG_2, temp);
 
 	return BIODYN_IMU_OK;
 }
@@ -790,36 +692,6 @@ static biodyn_imu_err_t self_test_gyro()
 	return BIODYN_IMU_OK;
 }
 */
-
-/**
- * Self-test the magnetometer of the IMU.
- * Uses the built-in structure of the AK09916 to perform self-tests on it's condition.
- */
-static biodyn_imu_err_t self_test_mag()
-{
-	// Start self-test on ak09916
-	// Read CNTL_2 to adjust for self-test
-	biodyn_imu_ak09916_read_reg(AK09916_CONTROL2, 1);
-
-	// Read output from external slave sensor data on icm20948
-	uint8_t temp;
-	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &temp);
-
-	// Or with self-test mode
-	temp |= 0b10000;
-	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, temp);
-
-	// Now in self-test mode, check response
-	// Check by checking DRDY (data ready) from status1
-
-	biodyn_imu_ak09916_read_reg(AK09916_STATUS1, 1);
-	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &temp);
-	if (temp & 0b11111111)
-		return BIODYN_IMU_OK;
-	ESP_LOGE(TAG, "SELF_TEST_MAG: Failed self-test with read value test actual: %x, expected: non-zero", temp);
-	biodyn_imu_icm20948_add_error_to_subsystem(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_MAG: Failed self-test");
-	return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
-}
 
 /**
  * Self-test on the entire IMU.
@@ -1043,15 +915,15 @@ static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t register_address, u
 {
 	// Set slave0 to be the built in magnetometer
 	// Or first bit with 0 in order to indicate write
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x00 | AK09916_ADDRESS);
+	write_reg(_b3, I2C_SLV0_ADDR, 0x00 | AK09916_ADDRESS);
 	// Set the register to write to
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, register_address);
+	write_reg(_b3, I2C_SLV0_REG, register_address);
 	// Set the data to write
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_DO, data);
+	write_reg(_b3, I2C_SLV0_DO, data);
 
 	// Enable and single data write
 	// TODO: what does this mean?
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | 0x01);
+	write_reg(_b3, I2C_SLV0_CTRL, 0x80 | 0x01);
 	// Delay to allow I2C transaction
 	vTaskDelay(pdMS_TO_TICKS(50));
 	// TODO: check if delay is necessary
@@ -1069,70 +941,17 @@ static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t register_address, ui
 {
 	// Set slave0 to be the built in magnetometer
 	// Or first bit with 1 in order to indicate read
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x80 | AK09916_ADDRESS);
+	write_reg(_b3, I2C_SLV0_ADDR, 0x80 | AK09916_ADDRESS);
 	// Set the register to read from
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, register_address);
+	write_reg(_b3, I2C_SLV0_REG, register_address);
 
 	// Enable and single data write
 	// TODO: see biodyn_imu_ak09916_write_reg function
 	// Bits [3:0] in I2C_SLV0_CTRL are the len to read (if capped)
-	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | len);
+	write_reg(_b3, I2C_SLV0_CTRL, 0x80 | len);
 	// Delay to allow I2C transaction
 	vTaskDelay(pdMS_TO_TICKS(50));
 
-	return BIODYN_IMU_OK;
-}
-
-/**
- * Initializes the magnetometer (i.e. the ak09916) within the IMU (via the icm20948).
- * Prerequisitely, the icm20948 must be somewhat initialized first.
- */
-static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
-{
-	uint8_t temp;
-	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &temp);
-	temp |= 0x02;
-	// Resets the I2C master module by writing 1 to the bit
-	// this bit set should auto clear after one clock cycle
-	// (internally at 20Mhz)
-	biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, temp);
-	// Wait for bit to auto clear
-	vTaskDelay(pdMS_TO_TICKS(100));
-
-	// Enable I2C by writing 1 to bit 5 in USER_CTRL
-	// TODO: Do I need to read again here
-	// Yes, the I2C reset can change bit 4 and 5, so new read is necessary
-	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &temp);
-	temp |= 0x20;
-	// Write 1 to bit 5 in USER_CTRL
-	biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, temp);
-
-	// Documentation states (p. 81):
-	/*
-	 To achieve a targeted clock
-	frequency of 400 kHz, MAX, it is recommended to set I2C_MST_CLK = 7 (345.6 kHz / 46.67% duty cycle).
-	*/
-	temp = 0x07;
-	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_CTRL, temp);
-
-	// Set for a custom rate to be used for sampling the magnetometer
-	temp = 0x40;
-	biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, temp);
-	// Set data rate as 136Hz
-	// Formula: 1.1 kHz/(2^((odr_config[3:0])) )
-	temp = 0x03;
-	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_ODR_CONFIG, temp);
-
-	// Reset magnetometer
-	biodyn_imu_ak09916_write_reg(AK09916_CONTROL3, 0x01);
-	// Delay to allow reset
-	vTaskDelay(pdMS_TO_TICKS(100));
-
-	// Start continuous mode:
-	// // Roughly sampling constantly at 100khz (Standard-mode p. 15)
-	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, 0x08);
-
-	// Magnetometer ready for use!
 	return BIODYN_IMU_OK;
 }
 
@@ -1167,4 +986,56 @@ biodyn_imu_err_t biodyn_imu_icm20948_config_accel(uint8_t accel_dlpfcfg, uint8_t
 biodyn_imu_err_t biodyn_imu_icm20948_config_accel_sample_averaging(uint8_t dec3_cfg)
 {
 	return BIODYN_IMU_OK;
+}
+
+biodyn_imu_err_t collect_err(biodyn_imu_err_t error, char *optional_attached_message)
+{
+	biodyn_imu_icm20948_in_error = true;
+	char error_msg[128]; // Enough space for message + suffix
+
+	switch (error)
+	{
+	case BIODYN_IMU_OK:
+		snprintf(error_msg, sizeof(error_msg), "BIODYN_IMU_OK");
+		break;
+	case BIODYN_IMU_ERR_COULDNT_INIT_SPI_BUS:
+		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_INIT_SPI_BUS");
+		break;
+	case BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV:
+		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_INIT_SPI_DEV");
+		break;
+	case BIODYN_IMU_ERR_COULDNT_SEND_DATA:
+		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_SEND_DATA");
+		break;
+	case BIODYN_IMU_ERR_WRONG_WHOAMI:
+		snprintf(error_msg, sizeof(error_msg), "IMU_WRONG_WHOAMI");
+		break;
+	case BIODYN_IMU_ERR_COULDNT_CONFIGURE:
+		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_CONFIGURE");
+		break;
+	case BIODYN_IMU_ERR_COULDNT_READ:
+		snprintf(error_msg, sizeof(error_msg), "IMU_COULDNT_READ");
+		break;
+	case BIODYN_IMU_ERR_INVALID_ARGUMENT:
+		snprintf(error_msg, sizeof(error_msg), "IMU_INVALID_ARGUMENT");
+		break;
+	default:
+		// Assume it is an esp error then,
+		// This esp method from esp_err.h also handles unknown errors for us
+		// Only overlap is BIODYN_IMU_OK and ESP_OK, therefore sufficient
+		snprintf(error_msg, sizeof(error_msg), "%s", esp_err_to_name(error));
+		break;
+	}
+
+	strncat(error_msg, "\n", sizeof(error_msg) - strlen(error_msg) - 1);
+
+	if (optional_attached_message != NULL)
+		strncat(error_msg, optional_attached_message, sizeof(error_msg) - strlen(error_msg) - 1);
+
+	strncpy(biodyn_imu_icm20948_errors[biodyn_imu_icm20948_error_index],
+			error_msg,
+			sizeof(biodyn_imu_icm20948_errors[biodyn_imu_icm20948_error_index]) - 1);
+
+	biodyn_imu_icm20948_error_index = (biodyn_imu_icm20948_error_index + 1) % 3;
+	return error;
 }
