@@ -178,7 +178,7 @@ biodyn_imu_err_t init_mag()
 	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_ADDR, AK09916_ADDRESS | AK09916_READ));
 	// -> We are reading the WHOAMI reg on the mag
 	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_REG, AK09916_WHOAMI));
-	// -> Enable reading and read one byte (data in EXT_SENS_DATA_00 for SLV0)
+	// -> Enable reading and read one byte
 	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_CTRL, 0x81));
 
 	{
@@ -188,18 +188,40 @@ biodyn_imu_err_t init_mag()
 		ESP_LOGI(TAG, "I2C_SLV4_REG: 0x%02x", val);
 		IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_CTRL, &val));
 		ESP_LOGI(TAG, "I2C_SLV4_CTRL: 0x%02x", val);
+		IMU_ERR_CHECK(read_reg(_b3, I2C_MST_CTRL, &val));
+		ESP_LOGI(TAG, "I2C_MST_CTRL: 0x%02x", val);
+		IMU_ERR_CHECK(read_reg(_b0, INT_PIN_CFG, &val));
+		ESP_LOGI(TAG, "INT_PIN_CFG: 0x%02x", val);
+		IMU_ERR_CHECK(read_reg(_b0, PWR_MGMT_1, &val));
+		ESP_LOGI(TAG, "PWR_MGMT_1: 0x%02x", val);
 	}
 
 	// -> Wait for read
-	vTaskDelay(pdMS_TO_TICKS(20));
-	// -> Check if this read was ack'd by mag
-	uint8_t ack_status = 0;
-	IMU_ERR_CHECK(read_reg(_b0, I2C_MST_STATUS, &ack_status));
-	if ((ack_status & I2C_SLV4_NACK) > 0)
-		return collect_err(BIODYN_IMU_ERR_NO_EXT_ACK, "I2C master read was not ack'd");
+	// vTaskDelay(pdMS_TO_TICKS(20));
+	uint8_t st = 0;
+	TickType_t t0 = xTaskGetTickCount();
+	bool timed_out = false;
+	do
+	{
+		IMU_ERR_CHECK(read_reg(_b0, I2C_MST_STATUS, &st));
+		if ((xTaskGetTickCount() - t0) > pdMS_TO_TICKS(100))
+		{
+			timed_out = true;
+			break;
+		}
+	} while ((st & I2C_SLV4_NACK) == 0); // bit6 = I2C_SLV4_DONE
+
+	{
+		IMU_ERR_CHECK(read_reg(_b0, I2C_SLV4_CTRL, &val));
+		ESP_LOGI(TAG, "I2C_SLV4_CTRL: 0x%02x", val);
+	}
+
+	if (timed_out)
+		return collect_err(BIODYN_IMU_ERR_NO_EXT_ACK, "AK09916 read timed out");
+
 	// -> Read external sensor data (mag)
 	uint8_t mag_whoami = 0;
-	IMU_ERR_CHECK(read_reg(_b0, EXT_SLV_SENS_DATA_04, &mag_whoami));
+	IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_DI, &mag_whoami));
 	// Check if this is what we expect
 	if (mag_whoami != 0x09)
 	{
