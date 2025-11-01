@@ -23,6 +23,10 @@
 #define PWR_MGMT_2 0x07
 #define USER_CTRL 0x03
 #define INT_PIN_CFG 0x0F
+#define I2C_MST_STATUS 0x17
+
+#define I2C_SLV0_NACK 0x01
+#define I2C_SLV4_NACK 0x10
 
 #define TEMP_OUT_H 0x39
 #define TEMP_OUT_L 0x3a
@@ -71,6 +75,12 @@
 #define I2C_SLV0_REG 0X04
 #define I2C_SLV0_CTRL 0X05
 #define I2C_SLV0_DO 0X06
+
+#define I2C_SLV4_ADDR 0x13
+#define I2C_SLV4_REG 0x14
+#define I2C_SLV4_CTRL 0x15
+#define I2C_SLV4_DO 0x16
+#define I2C_SLV4_DI 0x17
 
 #define AK09916_ADDRESS 0x0c
 #define AK09916_WIA 0x01

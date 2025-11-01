@@ -12,7 +12,6 @@
 
 static uint8_t accel_range_value = _accel_2g;
 static uint8_t gyro_range_value = _gyro_1000dps;
-
 static uint16_t accel_sensitivity_scale_factor = 0;
 static float gyro_sensitivity_scale_factor = -1;
 
@@ -60,7 +59,7 @@ uint8_t biodyn_imu_icm20948_error_index = 0;
 // TODO: add/remove necessary function prototypes with reorganization
 
 // Sets the user bank of registers
-static biodyn_imu_err_t set_user_bank(uint8_t bank);
+static biodyn_imu_err_t set_user_bank(user_bank_range bank);
 // Reads the user bank of registers
 static biodyn_imu_err_t get_user_bank(uint8_t *bank_out);
 // Writes data to a single register specified by a bank and address to the IMU
@@ -145,8 +144,8 @@ biodyn_imu_err_t imu_config_i2c()
 	// SPI-only and turn on internal I2C master
 	uint8_t uc = 0;
 	IMU_ERR_CHECK(read_reg(_b0, USER_CTRL, &uc));
-	uc |= 1 << 5; // I2C_MST_EN = 1 -> enable internal I2C for mag
-	uc |= 1 << 4; // I2C_IF_DIS = 1 -> put in SPI-only mode
+	uc |= 0x20; // I2C_MST_EN = 1 -> enable internal I2C for mag
+	uc |= 0x10; // I2C_IF_DIS = 1 -> put in SPI-only mode
 	IMU_ERR_CHECK(write_reg(_b0, USER_CTRL, uc));
 
 	// Disable I2C access of mag from external chips
@@ -166,18 +165,41 @@ biodyn_imu_err_t imu_config_i2c()
 // Configures the magnetometer
 biodyn_imu_err_t init_mag()
 {
+	uint8_t val;
+	{
+		IMU_ERR_CHECK(read_reg(_b0, LP_CONFIG, &val));
+		ESP_LOGI(TAG, "LP_CONFIG: 0x%02x", val);
+		IMU_ERR_CHECK(read_reg(_b0, USER_CTRL, &val));
+		ESP_LOGI(TAG, "USER_CTRL: 0x%02x", val);
+	}
+
 	// First step is to verify the WHOAMI for the mag
 	// -> We are reading the AK09916
-	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV0_ADDR, AK09916_ADDRESS | AK09916_READ));
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_ADDR, AK09916_ADDRESS | AK09916_READ));
 	// -> We are reading the WHOAMI reg on the mag
-	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV0_REG, AK09916_WHOAMI));
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_REG, AK09916_WHOAMI));
 	// -> Enable reading and read one byte (data in EXT_SENS_DATA_00 for SLV0)
-	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV0_CTRL, 0x81));
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_CTRL, 0x81));
+
+	{
+		IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_ADDR, &val));
+		ESP_LOGI(TAG, "I2C_SLV4_ADDR: 0x%02x", val);
+		IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_REG, &val));
+		ESP_LOGI(TAG, "I2C_SLV4_REG: 0x%02x", val);
+		IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_CTRL, &val));
+		ESP_LOGI(TAG, "I2C_SLV4_CTRL: 0x%02x", val);
+	}
+
 	// -> Wait for read
 	vTaskDelay(pdMS_TO_TICKS(20));
+	// -> Check if this read was ack'd by mag
+	uint8_t ack_status = 0;
+	IMU_ERR_CHECK(read_reg(_b0, I2C_MST_STATUS, &ack_status));
+	if ((ack_status & I2C_SLV4_NACK) > 0)
+		return collect_err(BIODYN_IMU_ERR_NO_EXT_ACK, "I2C master read was not ack'd");
 	// -> Read external sensor data (mag)
 	uint8_t mag_whoami = 0;
-	IMU_ERR_CHECK(read_reg(_b0, EXT_SLV_SENS_DATA_00, &mag_whoami));
+	IMU_ERR_CHECK(read_reg(_b0, EXT_SLV_SENS_DATA_04, &mag_whoami));
 	// Check if this is what we expect
 	if (mag_whoami != 0x09)
 	{
@@ -225,7 +247,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 /** Sets the user bank to @param bank
  * 	Range of [0, 3]
  */
-biodyn_imu_err_t set_user_bank(uint8_t bank)
+biodyn_imu_err_t set_user_bank(user_bank_range bank)
 {
 	// Check if bank is valid: range of [0, 3]
 	if (bank > _b3)
@@ -1018,6 +1040,9 @@ biodyn_imu_err_t collect_err(biodyn_imu_err_t error, char *optional_attached_mes
 		break;
 	case BIODYN_IMU_ERR_INVALID_ARGUMENT:
 		snprintf(error_msg, sizeof(error_msg), "IMU_INVALID_ARGUMENT");
+		break;
+	case BIODYN_IMU_ERR_NO_EXT_ACK:
+		snprintf(error_msg, sizeof(error_msg), "IMU_EXT_NOT_ACKD");
 		break;
 	default:
 		// Assume it is an esp error then,
