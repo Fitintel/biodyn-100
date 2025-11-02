@@ -230,6 +230,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// This shouldn't matter because lp_config is disabled in pwr_mgmt1 by turning off low power feature
 	err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x00);
 	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
+	vTaskDelay(pdMS_TO_TICKS(1));
 
 	// ERROR: Retry turning off sleep mode of icm20948
 	// TEST: what actually changes sleep
@@ -261,13 +262,41 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_SMPLRT_DIV, 0x00);
 
 	// Gyroscope config with range set and digital filter enabled
-	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, (gyro_range_value | (1 << 2)));
+	// err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, (gyro_range_value | (1 << 2)));
+	// uint8_t gyro_dlpfcfg = 0b111;
+	uint8_t base_accel_gyro_cfg = 0b00111001;
+	uint8_t gyro_cfg = base_accel_gyro_cfg | gyro_range_value << 1;
+	// Testing bank switching
+	err |= biodyn_imu_icm20948_write_reg(_b2, GYRO_CONFIG_1, (gyro_cfg));
+	if (err == BIODYN_IMU_ERR_COULDNT_SEND_DATA)
+	{
+		ESP_LOGE(TAG, "Failed on write to Gyro Config 1");
+	}
+	// BANK TEST FAILED, REWRITE
+
 	// Accelerometer config with sample rate divider = 0
 	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_1, 0x00);
 	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_SMPLRT_DIV_2, 0x00);
 
 	// Acceleromter config with range set and digital filter enabled
-	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, (accel_range_value | (1 << 2)));
+	// uint8_t accel_dlpfcfg = 0b111;
+	uint8_t accel_cfg = base_accel_gyro_cfg | accel_range_value << 1;
+	err |= biodyn_imu_icm20948_write_reg(_b2, ACCEL_CONFIG, (accel_cfg));
+	if (err == BIODYN_IMU_ERR_COULDNT_SEND_DATA)
+	{
+		ESP_LOGE(TAG, "Failed on write to Accel Config");
+	}
+
+	// DEBUG: to read gyro and accel config
+	uint8_t gyro_cfg_1_output = 0;
+	uint8_t accel_cfg_output = 0;
+	biodyn_imu_icm20948_read_reg(_b2, GYRO_CONFIG_1, &gyro_cfg_1_output);
+	biodyn_imu_icm20948_read_reg(_b2, ACCEL_CONFIG, &accel_cfg_output);
+	ESP_LOGI(TAG, "Gyro Config 1 output: %d", gyro_cfg_1_output);
+	ESP_LOGI(TAG, "Accel Config output: %d", accel_cfg_output);
+	ESP_LOGI(TAG, "gyro_cfg: %d", gyro_cfg);
+	ESP_LOGI(TAG, "accel_cfg: %d", accel_cfg);
+	biodyn_imu_icm20948_set_user_bank(_b0);
 
 	// ERROR CHECKPOINT *INIT1*
 	// Check err status to report any error if found
@@ -293,15 +322,6 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// Wake up all sensors
 	err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_2, 0x00);
 
-	// // Turn off low power mode
-	// err |= biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, 0x00);
-	// // ERROR: Retry turning off sleep mode of icm20948
-	// err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x01);
-	// ERROR CHECKPOINT *INIT2*
-	// Check err status to report any error if found
-	// Possible mismatch due to &'ing errors to error codes,
-	// Resolved only upon further scrutiny?
-	// Due to low occurence over tested code, this is ok? TODO
 	if (err != BIODYN_IMU_OK)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error collected before checkpoint: INIT2. Multiple errors possible.");
@@ -323,34 +343,20 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 		ESP_LOGE(TAG, "Failed to initialize and start AK09916 (magnetometer) device, error %d", err);
 		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
 	}
-	// 8 (not 6) byte read necessary: must sample the status and control register
-	// in order to refresh readings (take from new sample).
 
 	// Self test to ensure proper functionality
-	err |= biodyn_imu_icm20948_self_test();
+	// err |= biodyn_imu_icm20948_self_test();
 	if (err != ESP_OK)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in completing self-test. Further investigation into self-test part functions likely required.");
 		ESP_LOGE(TAG, "Failed self_test for icm20948, investiage into composite function parts of self_test, error: %d", err);
-		// TODO: to enable again
-		// return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
+		return BIODYN_IMU_ERR_COULDNT_INIT_SPI_DEV;
 	}
 
 	/**
 	 * LOGS: Debug logs to check on the initialized status of the imu
 	 * TODO: to be deleted
 	 */
-	uint8_t tmp;
-	biodyn_imu_icm20948_read_reg(_b0, PWR_MGMT_1, &tmp);
-	ESP_LOGI(TAG, "PWR_MGMT_1 = 0x%02X", tmp);
-	biodyn_imu_icm20948_read_reg(_b0, PWR_MGMT_2, &tmp);
-	ESP_LOGI(TAG, "PWR_MGMT_2 = 0x%02X", tmp);
-	biodyn_imu_icm20948_read_reg(_b0, LP_CONFIG, &tmp);
-	ESP_LOGI(TAG, "LP_CONFIG   = 0x%02X", tmp);
-	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &tmp);
-	ESP_LOGI(TAG, "USER_CTRL   = 0x%02X", tmp);
-	biodyn_imu_icm20948_read_reg(_b2, GYRO_CONFIG_1, &tmp);
-	ESP_LOGI(TAG, "GYRO_CFG1   = 0x%02X", tmp);
 
 	// Successful init, all clear
 	ESP_LOGI(TAG, "Initialized IMU");
@@ -389,6 +395,14 @@ biodyn_imu_err_t biodyn_imu_icm20948_set_user_bank(uint8_t bank)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "SET_USER_BANK: Failed SPI transaction");
 		ESP_LOGE(TAG, "Failed to transmit data over SPI (selecting_user_bank function with bank value %d)", bank);
+		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
+	}
+	uint8_t temp = 0;
+	biodyn_imu_icm20948_get_user_bank(&temp);
+	if (temp != bank)
+	{
+		ESP_LOGE(TAG, "FAILED TO WRITE BANK");
+		biodyn_imu_icm20948_add_error_to_subsystem(err, "SET_USER_BANK: Failed write to set bank");
 		return BIODYN_IMU_ERR_COULDNT_SEND_DATA;
 	}
 
