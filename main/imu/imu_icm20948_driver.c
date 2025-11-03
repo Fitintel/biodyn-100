@@ -276,15 +276,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	ESP_LOGI(TAG, "\tConfigured IMU I2C and SPI");
 
 	// Init magnetometer
-	biodyn_imu_err_t err = BIODYN_IMU_OK;
-	int tries = 0;
-	while ((err = init_mag()) != BIODYN_IMU_OK)
-	{
-		if (tries > 10)
-			return collect_err(BIODYN_IMU_ERR_COULDNT_INIT_MAG, "Failed to initialize magnetometer after multiple tries");
-		vTaskDelay(pdMS_TO_TICKS(100));
-		++tries;
-	}
+	IMU_ERR_CHECK(init_mag());
 	ESP_LOGI(TAG, "\tInitialized magnetometer");
 
 	// Initialize configuration data
