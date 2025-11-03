@@ -22,6 +22,7 @@
 #define PWR_MGMT_1 0x06
 #define PWR_MGMT_2 0x07
 #define USER_CTRL 0x03
+#define I2C_MST_STATUS 0x17
 
 #define TEMP_OUT_H 0x39
 #define TEMP_OUT_L 0x3a

@@ -237,16 +237,36 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	// err |= biodyn_imu_icm20948_write_reg(_b0, PWR_MGMT_1, 0x41);
 
 	// Serial interface in SPI mode only
-	uint8_t user_ctrl_data;
-	err |= biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
-	user_ctrl_data |= 0x10;
-	err |= biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, user_ctrl_data);
+	// uint8_t user_ctrl_data;
+	// err |= biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &user_ctrl_data);
+	// user_ctrl_data |= 0x10;
+	// err |= biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, user_ctrl_data);
 
 	// DEBUG TEST: RE-ENABLE I2C MASTER
-	uint8_t uc;
+
+	uint8_t uc = 0;
+	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &uc);
+	uc |= 0x02; // I2C_MST_RESET
+	err |= biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, uc);
+	vTaskDelay(pdMS_TO_TICKS(10));
+
+	uc &= ~0x02; // Clear reset bit
+	err |= biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, uc);
+	vTaskDelay(pdMS_TO_TICKS(10));
+
+	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &uc);
+	uc &= ~0x10; // CLEAR I2C_IF_DIS
+	err |= biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, uc);
+	ESP_LOGI(TAG, "USER_CTRL = 0x%02X (I2C_IF_DIS cleared)", uc);
+
+	vTaskDelay(pdMS_TO_TICKS(10));
 	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &uc);
 	uc |= 0x20; // I2C_MST_EN
 	err |= biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, uc);
+
+	// // TEST, see what user ctrl is now
+	// biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &uc);
+	// ESP_LOGI(TAG, "Finally, user_ctrl is: %x", uc);
 
 	// Align output data rate
 	// ODR start-time alignements starts when any of the following is written to:
@@ -330,12 +350,6 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 
 	// Initialize magnetometer
 	err |= biodyn_imu_icm20948_init_magnetomter();
-	// Configure I2C Slave 0 for continuous burst read (p. 69-70, 78)
-	// WARNING: writing to I2C_SLV0_CTRL breaks burst read, and disables proper reading for magnetometer
-	err |= biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x80 | AK09916_ADDRESS); // Read from AK09916
-	err |= biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, AK09916_HXL);			  // Start at HXL
-	err |= biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | 0x08);			  // Enable + 8 bytes
-	vTaskDelay(pdMS_TO_TICKS(10));
 
 	if (err != ESP_OK)
 	{
@@ -345,7 +359,7 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	}
 
 	// Self test to ensure proper functionality
-	// err |= biodyn_imu_icm20948_self_test();
+	err |= biodyn_imu_icm20948_self_test();
 	if (err != ESP_OK)
 	{
 		biodyn_imu_icm20948_add_error_to_subsystem(err, "ICM_20948_INIT: error in completing self-test. Further investigation into self-test part functions likely required.");
@@ -801,13 +815,45 @@ static biodyn_imu_err_t self_test_accel_gyro()
  */
 static biodyn_imu_err_t self_test_mag()
 {
+	// Start by confirming who am I
+	uint8_t ak09916_wia_output = 0;
+	biodyn_imu_ak09916_read_reg(AK09916_WIA, 1);
+	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &ak09916_wia_output);
+	ESP_LOGI(TAG, "AK09916 WHO AM I: expected: 0x09, actual: %x", ak09916_wia_output);
+
+	// test again to check reset time and ability of ext slv sens data 00
+	biodyn_imu_ak09916_read_reg(AK09916_WIA, 1);
+	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &ak09916_wia_output);
+	ESP_LOGI(TAG, "AK09916 WHO AM I: expected: 0x09, actual: %x", ak09916_wia_output);
+
+	// Check I2C master status for errors (NACK, etc.)
+	uint8_t mst_status = 0;
+	biodyn_imu_icm20948_read_reg(_b0, I2C_MST_STATUS, &mst_status);
+	ESP_LOGI(TAG, "I2C_MST_STATUS: 0x%02X", mst_status);
+
+	// Key bits:
+	// Bit 7: PASS_THROUGH (should be 0)
+	// Bit 6: I2C_SLV4_DONE
+	// Bit 5: I2C_LOST_ARB
+	// Bit 4: I2C_SLV0_NACK  ← VERY IMPORTANT
+	// Bit 3: I2C_SLV1_NACK
+	// ...
+	if (mst_status & 0x10)
+	{
+		ESP_LOGE(TAG, "I2C_SLV0_NACK: AK09916 not responding!");
+	}
+	if (mst_status & 0x20)
+	{
+		ESP_LOGE(TAG, "I2C_LOST_ARB: Bus arbitration lost!");
+	}
+
 	// Start self-test on ak09916
 	// Read CNTL_2 to adjust for self-test
 	biodyn_imu_ak09916_read_reg(AK09916_CONTROL2, 0x10);
 	vTaskDelay(pdMS_TO_TICKS(1));
 
 	// Trigger a single read by reading STATUS1 to get data ready (DRDY)
-	biodyn_imu_ak09916_read_reg(AK09916_STATUS1, 1);
+	// biodyn_imu_ak09916_read_reg(AK09916_STATUS1, 1);
 
 	// Read output from external slave sensor data on icm20948
 	uint8_t temp;
@@ -1114,53 +1160,80 @@ static biodyn_imu_err_t biodyn_imu_ak09916_read_reg(uint8_t register_address, ui
  */
 static biodyn_imu_err_t biodyn_imu_icm20948_init_magnetomter()
 {
-	uint8_t temp;
+	uint8_t temp = 0;
+
+	ESP_LOGI(TAG, "Initializing AK09916 magnetometer...");
+
+	// === 1. Enable I2C Master ===
 	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &temp);
-	temp |= 0x02;
-	// Resets the I2C master module by writing 1 to the bit
-	// this bit set should auto clear after one clock cycle
-	// (internally at 20Mhz)
+	temp |= 0x20; // I2C_MST_EN
 	biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, temp);
-	// Wait for bit to auto clear
-	vTaskDelay(pdMS_TO_TICKS(100));
+	vTaskDelay(pdMS_TO_TICKS(10));
 
-	// Enable I2C by writing 1 to bit 5 in USER_CTRL
-	// TODO: Do I need to read again here
-	// Yes, the I2C reset can change bit 4 and 5, so new read is necessary
-	biodyn_imu_icm20948_read_reg(_b0, USER_CTRL, &temp);
-	temp |= 0x20;
-	// Write 1 to bit 5 in USER_CTRL
-	biodyn_imu_icm20948_write_reg(_b0, USER_CTRL, temp);
+	// === 2. Set I2C Clock ===
+	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_CTRL, 0x07); // 345.6 kHz
+	vTaskDelay(pdMS_TO_TICKS(1));
 
-	// Documentation states (p. 81):
-	/*
-	 To achieve a targeted clock
-	frequency of 400 kHz, MAX, it is recommended to set I2C_MST_CLK = 7 (345.6 kHz / 46.67% duty cycle).
-	*/
-	temp = 0x07;
-	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_CTRL, temp);
+	// === 3. Clear delay for SLV0 ===
+	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_DELAY_CTRL, 0x00);
+	vTaskDelay(pdMS_TO_TICKS(1));
 
-	// // Set for a custom rate to be used for sampling the magnetometer
-	// temp = 0x40;
-	// biodyn_imu_icm20948_write_reg(_b0, LP_CONFIG, temp);
-	// Set data rate as 136Hz
-	// Formula: 1.1 kHz/(2^((odr_config[3:0])) )
-	temp = 0x03;
-	biodyn_imu_icm20948_write_reg(_b3, I2C_MST_ODR_CONFIG, temp);
+	// === 4. TEST WIA (single byte) ===
+	ESP_LOGI(TAG, "Reading AK09916 WIA...");
+	// Test, force nack by using address 0xFF (out of bounds) instead of AK09916_ADDRESS
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x80 | 0xff);
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, AK09916_WIA);
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | 0x01); // 1 byte, EN
 
-	// Reset magnetometer
-	biodyn_imu_ak09916_write_reg(AK09916_CONTROL3, 0x01);
-	// Delay to allow reset
-	vTaskDelay(pdMS_TO_TICKS(100));
+	// === WAIT FOR DONE ===
+	uint8_t mst_status = 0;
+	int retries = 0;
+	do
+	{
+		vTaskDelay(pdMS_TO_TICKS(1));
+		biodyn_imu_icm20948_read_reg(_b0, I2C_MST_STATUS, &mst_status);
+		if (mst_status & 0x40)
+			break; // I2C_SLV0_DONE
+		retries++;
+	} while (retries < 20);
 
-	// Start continuous mode:
-	// // Roughly sampling constantly at 100khz (Standard-mode p. 15)
-	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, 0x08);
-	ESP_LOGI(TAG, "Magnetometer (AK09916) initialized!");
-	// Magnetometer ready for use!
+	if (!(mst_status & 0x40))
+	{
+		ESP_LOGE(TAG, "WIA: I2C_SLV0_DONE timeout! STATUS=0x%02X", mst_status);
+		return BIODYN_IMU_ERR_COULDNT_READ;
+	}
+	if (mst_status & 0x10)
+	{
+		ESP_LOGE(TAG, "WIA: I2C_SLV0_NACK! AK09916 not responding.");
+		return BIODYN_IMU_ERR_COULDNT_READ;
+	}
+
+	// === READ WIA ===
+	uint8_t wia = 0;
+	biodyn_imu_icm20948_read_reg(_b0, EXT_SLV_SENS_DATA_00, &wia);
+	ESP_LOGI(TAG, "AK09916 WIA: 0x%02X (expected 0x09)", wia);
+	if (wia != 0x09)
+	{
+		ESP_LOGE(TAG, "WIA failed! Got 0x%02X", wia);
+		return BIODYN_IMU_ERR_COULDNT_READ;
+	}
+
+	// === 5. NOW REPROGRAM FOR BURST READ (8 bytes) ===
+	ESP_LOGI(TAG, "Reprogramming I2C_SLV0 for burst read (8 bytes from HXL)...");
+
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_ADDR, 0x80 | AK09916_ADDRESS);
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_REG, AK09916_HXL);
+	biodyn_imu_icm20948_write_reg(_b3, I2C_SLV0_CTRL, 0x80 | 0x08); // 8 bytes, EN
+
+	vTaskDelay(pdMS_TO_TICKS(10));
+
+	// === 6. Start continuous mode on AK09916 ===
+	biodyn_imu_ak09916_write_reg(AK09916_CONTROL2, 0x08); // 100 Hz
+	vTaskDelay(pdMS_TO_TICKS(10));
+
+	ESP_LOGI(TAG, "AK09916 initialized and burst read active!");
 	return BIODYN_IMU_OK;
 }
-
 /**
  * Returns whether the IMU is currently in a state of error
  */

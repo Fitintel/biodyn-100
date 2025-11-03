@@ -42,9 +42,9 @@ typedef enum
 typedef enum
 {
 	_b0 = 0,
-	_b1 = 1 << 4,
-	_b2 = 2 << 4,
-	_b3 = 3 << 4,
+	_b1 = 1,
+	_b2 = 2,
+	_b3 = 3,
 } user_bank_range;
 
 struct imu_float3
