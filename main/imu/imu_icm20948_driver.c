@@ -63,9 +63,9 @@ static biodyn_imu_err_t set_user_bank(user_bank_range bank);
 // Reads the user bank of registers
 static biodyn_imu_err_t get_user_bank(uint8_t *bank_out);
 // Writes data to a single register specified by a bank and address to the IMU
-static biodyn_imu_err_t write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data);
+static biodyn_imu_err_t write_reg(user_bank_range bank, uint16_t register_address, uint8_t write_data);
 // Reads data of a single register specified by a bank and address of the IMU
-static biodyn_imu_err_t read_reg(uint8_t bank, uint16_t register_address, uint8_t *out);
+static biodyn_imu_err_t read_reg(user_bank_range bank, uint16_t register_address, uint8_t *out);
 // Write a byte to the magnetometer attached to the IMU
 static biodyn_imu_err_t biodyn_imu_ak09916_write_reg(uint8_t reg, uint8_t data);
 // Read multiple bytes from the magnetometer attached to the IMU
@@ -148,17 +148,72 @@ biodyn_imu_err_t imu_config_i2c()
 	uc |= 0x10; // I2C_IF_DIS = 1 -> put in SPI-only mode
 	IMU_ERR_CHECK(write_reg(_b0, USER_CTRL, uc));
 
-	// Disable I2C access of mag from external chips
-	IMU_ERR_CHECK(write_reg(_b0, INT_PIN_CFG, 0x00));
-
 	// Single-master mode and 345 kHz internal I2C clock
 	IMU_ERR_CHECK(write_reg(_b3, I2C_MST_CTRL, 0x07));
+
+	// Disable I2C access of mag from external chips
+	IMU_ERR_CHECK(write_reg(_b0, INT_PIN_CFG, 0x00));
 
 	// Align I2C mag reads with the timing of accel,gyro reads so our data
 	// has consistent timing.
 	// We do not need I2C_MST_DELAY_CTRL or I2C_MST_DELAY_CTRL.
 	IMU_ERR_CHECK(write_reg(_b2, ODR_ALIGN_EN, 0x01));
 
+	// Reset I2C master
+	// IMU_ERR_CHECK(write_reg(_b0, USER_CTRL, (uc | 0x02) & ~0x20));
+	// vTaskDelay(pdMS_TO_TICKS(10));
+	// IMU_ERR_CHECK(write_reg(_b0, USER_CTRL, uc | 0x20)); // Re-enable I2C master
+	// vTaskDelay(pdMS_TO_TICKS(10));
+
+	vTaskDelay(pdMS_TO_TICKS(10));
+	return BIODYN_IMU_OK;
+}
+
+biodyn_imu_err_t write_mag(uint8_t reg, uint8_t value)
+{
+	// Set addr in IMU which is the internal I2C addr to write to
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_ADDR, AK09916_ADDRESS_WRITE));
+	// Set the value to write
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_DO, value));
+	// Set the I2C register of the given addr to write to
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_REG, reg));
+	// Enable this slave
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_CTRL, 0x80));
+
+	// Wait for write to complete by checking SLV4_CTRL EN bit
+	uint8_t st;
+	TickType_t t0 = xTaskGetTickCount();
+	do
+	{
+		IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_CTRL, &st));
+		if ((xTaskGetTickCount() - t0) > pdMS_TO_TICKS(150))
+			return collect_err(BIODYN_IMU_ERR_NO_EXT_ACK, "Mag write timed out");
+	} while ((st & 0x80) != 0);
+	return BIODYN_IMU_OK;
+}
+
+biodyn_imu_err_t read_mag(uint8_t reg, uint8_t *out)
+{
+	// Set addr in IMU which is the internal I2C addr to write to
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_ADDR, AK09916_ADDRESS_READ));
+	// Set the value to write
+	// Set the I2C register of the given addr to write to
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_REG, reg));
+	// Enable this slave
+	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_CTRL, 0x81));
+
+	// Wait for write to complete by checking SLV4_CTRL EN bit
+	uint8_t st;
+	TickType_t t0 = xTaskGetTickCount();
+	do
+	{
+		IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_CTRL, &st));
+		if ((xTaskGetTickCount() - t0) > pdMS_TO_TICKS(150))
+			return collect_err(BIODYN_IMU_ERR_NO_EXT_ACK, "Mag read timed out");
+	} while ((st & 0x80) != 0);
+
+	// Put data in out
+	IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_DI, out));
 	return BIODYN_IMU_OK;
 }
 
@@ -167,61 +222,30 @@ biodyn_imu_err_t init_mag()
 {
 	uint8_t val;
 	{
+		ESP_LOGI(TAG, "Register configuration: ");
 		IMU_ERR_CHECK(read_reg(_b0, LP_CONFIG, &val));
-		ESP_LOGI(TAG, "LP_CONFIG: 0x%02x", val);
+		ESP_LOGI(TAG, "\tLP_CONFIG: 0x%02x", val);
 		IMU_ERR_CHECK(read_reg(_b0, USER_CTRL, &val));
-		ESP_LOGI(TAG, "USER_CTRL: 0x%02x", val);
-	}
-
-	// First step is to verify the WHOAMI for the mag
-	// -> We are reading the AK09916
-	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_ADDR, AK09916_ADDRESS | AK09916_READ));
-	// -> We are reading the WHOAMI reg on the mag
-	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_REG, AK09916_WHOAMI));
-	// -> Enable reading and read one byte
-	IMU_ERR_CHECK(write_reg(_b3, I2C_SLV4_CTRL, 0x81));
-
-	{
-		IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_ADDR, &val));
-		ESP_LOGI(TAG, "I2C_SLV4_ADDR: 0x%02x", val);
-		IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_REG, &val));
-		ESP_LOGI(TAG, "I2C_SLV4_REG: 0x%02x", val);
-		IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_CTRL, &val));
-		ESP_LOGI(TAG, "I2C_SLV4_CTRL: 0x%02x", val);
+		ESP_LOGI(TAG, "\tUSER_CTRL: 0x%02x", val);
 		IMU_ERR_CHECK(read_reg(_b3, I2C_MST_CTRL, &val));
-		ESP_LOGI(TAG, "I2C_MST_CTRL: 0x%02x", val);
+		ESP_LOGI(TAG, "\tI2C_MST_CTRL: 0x%02x", val);
 		IMU_ERR_CHECK(read_reg(_b0, INT_PIN_CFG, &val));
-		ESP_LOGI(TAG, "INT_PIN_CFG: 0x%02x", val);
+		ESP_LOGI(TAG, "\tINT_PIN_CFG: 0x%02x", val);
 		IMU_ERR_CHECK(read_reg(_b0, PWR_MGMT_1, &val));
-		ESP_LOGI(TAG, "PWR_MGMT_1: 0x%02x", val);
+		ESP_LOGI(TAG, "\tPWR_MGMT_1: 0x%02x", val);
+		IMU_ERR_CHECK(read_reg(_b0, PWR_MGMT_2, &val));
+		ESP_LOGI(TAG, "\tPWR_MGMT_2: 0x%02x", val);
+		IMU_ERR_CHECK(read_reg(_b0, ODR_ALIGN_EN, &val));
+		ESP_LOGI(TAG, "\tODR_ALIGN_EN: 0x%02x", val);
 	}
 
-	// -> Wait for read
-	// vTaskDelay(pdMS_TO_TICKS(20));
-	uint8_t st = 0;
-	TickType_t t0 = xTaskGetTickCount();
-	bool timed_out = false;
-	do
-	{
-		IMU_ERR_CHECK(read_reg(_b0, I2C_MST_STATUS, &st));
-		if ((xTaskGetTickCount() - t0) > pdMS_TO_TICKS(100))
-		{
-			timed_out = true;
-			break;
-		}
-	} while ((st & I2C_SLV4_NACK) == 0); // bit6 = I2C_SLV4_DONE
+	// We're going to reset the mag by writing 0x01 to CNTL3
+	write_mag(AK09916_CONTROL3, 0x01);
+	vTaskDelay(pdMS_TO_TICKS(120));
 
-	{
-		IMU_ERR_CHECK(read_reg(_b0, I2C_SLV4_CTRL, &val));
-		ESP_LOGI(TAG, "I2C_SLV4_CTRL: 0x%02x", val);
-	}
-
-	if (timed_out)
-		return collect_err(BIODYN_IMU_ERR_NO_EXT_ACK, "AK09916 read timed out");
-
-	// -> Read external sensor data (mag)
+	// Verify the AK09916 WHOAMI (WIA2)
 	uint8_t mag_whoami = 0;
-	IMU_ERR_CHECK(read_reg(_b3, I2C_SLV4_DI, &mag_whoami));
+	IMU_ERR_CHECK(read_mag(AK09916_WHOAMI, &mag_whoami));
 	// Check if this is what we expect
 	if (mag_whoami != 0x09)
 	{
@@ -252,7 +276,15 @@ biodyn_imu_err_t biodyn_imu_icm20948_init()
 	ESP_LOGI(TAG, "\tConfigured IMU I2C and SPI");
 
 	// Init magnetometer
-	IMU_ERR_CHECK(init_mag());
+	biodyn_imu_err_t err = BIODYN_IMU_OK;
+	int tries = 0;
+	while ((err = init_mag()) != BIODYN_IMU_OK)
+	{
+		if (tries > 10)
+			return collect_err(BIODYN_IMU_ERR_COULDNT_INIT_MAG, "Failed to initialize magnetometer after multiple tries");
+		vTaskDelay(pdMS_TO_TICKS(100));
+		++tries;
+	}
 	ESP_LOGI(TAG, "\tInitialized magnetometer");
 
 	// Initialize configuration data
@@ -350,7 +382,7 @@ biodyn_imu_err_t get_user_bank(uint8_t *bank_out)
  * @param register_address the local address of the register within the bank
  * @param out the output stored read result from the icm20948
  */
-biodyn_imu_err_t read_reg(uint8_t bank, uint16_t register_address, uint8_t *out)
+biodyn_imu_err_t read_reg(user_bank_range bank, uint16_t register_address, uint8_t *out)
 {
 	// Ensure valid pointer
 	if (!out)
@@ -393,7 +425,7 @@ biodyn_imu_err_t read_reg(uint8_t bank, uint16_t register_address, uint8_t *out)
  * Acceptable length between 1 and the amount of registers remaining in the bank after @param register_address
  * See @fn iodyn_imu_icm20948_read_reg for further details on use
  */
-biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(uint8_t bank, uint16_t register_address, uint8_t *out, uint8_t length)
+biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(user_bank_range bank, uint16_t register_address, uint8_t *out, uint8_t length)
 {
 	// Invalid pointer throws an error
 	if (!out || length == 0)
@@ -438,19 +470,20 @@ biodyn_imu_err_t biodyn_imu_icm20948_multibyte_read_reg(uint8_t bank, uint16_t r
  * @param register_address the local address of the register within the bank
  * @param write_data the data to write to the imu
  */
-biodyn_imu_err_t write_reg(uint8_t bank, uint16_t register_address, uint8_t write_data)
+biodyn_imu_err_t write_reg(user_bank_range bank, uint16_t register_address, uint8_t write_data)
 {
 	// Select user bank to write to
 	set_user_bank(bank);
 
 	// Use input register address OR with WRITE_MSB (0), with write data as second argument
 	uint8_t tx_data[2] = {register_address | WRITE_MSB, write_data};
+	uint8_t rx_data[2] = {0};
 
 	// length 2 (bytes) = max{rx_data length, tx_data length}
 	spi_transaction_t trans = {
 		.length = 8 * 2,
 		.tx_buffer = tx_data,
-		.rx_buffer = NULL,
+		.rx_buffer = rx_data,
 	};
 	// SPI TRANSACTION
 	esp_err_t err = spi_device_transmit(imu_data.handle, &trans);
@@ -750,17 +783,18 @@ biodyn_imu_err_t biodyn_imu_icm20948_self_test()
 	// Check that WHOAMI value is the same
 	if ((err = self_test_whoami()))
 	{
-		ESP_LOGE(TAG, "Self test failed - whoami (%x)", err);
+		ESP_LOGE(TAG, "\tSelf test failed - whoami (%x)", err);
 		return err;
 	}
-	ESP_LOGI(TAG, "Correct WHOAMI");
+	ESP_LOGI(TAG, "\tCorrect WHOAMI");
 
 	// Check that user bank selection works
 	if ((err = self_test_user_banks()))
 	{
-		ESP_LOGE(TAG, "Self test failed - user banks (%x)", err);
+		ESP_LOGE(TAG, "\tSelf test failed - user banks (%x)", err);
 		return err;
 	}
+	ESP_LOGI(TAG, "\tUser banks working");
 	// // Run gyro self-test
 	// if ((err = self_test_gyro()))
 	// {

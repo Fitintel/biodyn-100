@@ -27,6 +27,7 @@
 
 #define I2C_SLV0_NACK 0x01
 #define I2C_SLV4_NACK 0x10
+#define I2C_SLV4_DONE 0x40
 
 #define TEMP_OUT_H 0x39
 #define TEMP_OUT_L 0x3a
@@ -83,6 +84,8 @@
 #define I2C_SLV4_DI 0x17
 
 #define AK09916_ADDRESS 0x0c
+#define AK09916_ADDRESS_READ 0x8c
+#define AK09916_ADDRESS_WRITE 0x0c
 #define AK09916_WIA 0x01
 #define AK09916_STATUS1 0x10
 #define AK09916_HXL 0x11
