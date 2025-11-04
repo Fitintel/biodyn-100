@@ -7,6 +7,7 @@ idf_component_register(
     "system/self_test.c"
     "system/time_sync.c"
     "system/data_fast.c"
+	"emg/emg_driver.c"
     "main.c"
     INCLUDE_DIRS "."
 )

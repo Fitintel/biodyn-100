@@ -12,7 +12,6 @@ const static struct biodyn_ble_characteristic data_fast_chars[] = {
 		.uuid = BIODYN_BLE_UUID_16(0x4153),
 		.permissions = BIODYN_PERM_READ,
 		.properties = BIODYN_PROP_READ,
-		// TODO: Implement packed collective data read
 		.get_data = ble_data_fast_packed,
 	},
 	{
@@ -20,7 +19,6 @@ const static struct biodyn_ble_characteristic data_fast_chars[] = {
 		.uuid = BIODYN_BLE_UUID_16(0x4157),
 		.permissions = BIODYN_PERM_READ_WRITE,
 		.properties = BIODYN_PROP_READ_WRITE,
-		// TODO: Implement time sync hearbeat read/write
 		.set_data = ble_time_sync_ticker_write,
 		.get_data = ble_time_sync_ticker_read,
 	},
@@ -29,7 +27,6 @@ const static struct biodyn_ble_characteristic data_fast_chars[] = {
 		.uuid = BIODYN_BLE_UUID_16(0x4158),
 		.permissions = BIODYN_PERM_READ_WRITE,
 		.properties = BIODYN_PROP_READ_WRITE,
-		// TODO: Implement time sync round trip time (RTT) read/write
 		.set_data = ble_time_sync_rtt_write,
 		.get_data = ble_time_sync_rtt_read,
 	},
