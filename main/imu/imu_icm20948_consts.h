@@ -1,6 +1,9 @@
 #ifndef IMU_ICM20948_CONSTANTS
 #define IMU_ICM20948_CONSTANTS
 
+#define ICM20948_ADDR 0x69
+#define AK09916_ADDR 0x0c
+
 #define IMU_WHOAMI 0x0
 #define LP_CONFIG 0x05
 #define ACCEL_XOUT_H 0x2d
@@ -75,7 +78,7 @@
 #define I2C_SLV0_CTRL 0X05
 #define I2C_SLV0_DO 0X06
 
-#define AK09916_ADDRESS 0x0c
+// #define AK09916_ADDRESS 0x0c
 #define AK09916_WIA 0x01
 #define AK09916_STATUS1 0x10
 #define AK09916_HXL 0x11
