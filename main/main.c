@@ -19,12 +19,7 @@
 #include "bluetooth/ble.h"
 #include "bluetooth/ble_profiles.h"
 #include "biodyn_systems.h"
-
-// void test_accel_imu_icm20948();
-// void test_all_registers_imu_icm20948();
-// void test_accel_gyro_imu_icm20948();
-void test_imu_icm20948();
-void test_accel_gyro_mag_imu_icm20948();
+#include "system/data_fast.h"
 
 // APP ENTRY POINT
 void app_main(void)
@@ -53,6 +48,7 @@ void app_main(void)
 		const biodyn_system *system = &biodyn_systems[i];
 		if ((err = system->init()) != ESP_OK)
 			ESP_LOGE(MAIN_TAG, "Subsystem %s failed during initialization: err code %x", system->name, err);
+		system->self_test();
 		if (system->has_error())
 			ESP_LOGE(MAIN_TAG, "Failed to initialize subsystem %s: \"%s\"", system->name, system->get_error());
 	}
@@ -67,7 +63,7 @@ void app_main(void)
 	// Set up!
 	ESP_LOGI(MAIN_TAG, "Finished setup");
 
-	test_accel_gyro_mag_imu_icm20948();
+	//test_accel_gyro_mag_imu_icm20948();
 }
 
 void test_accel_gyro_mag_imu_icm20948()

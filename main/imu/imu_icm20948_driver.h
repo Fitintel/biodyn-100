@@ -82,7 +82,9 @@ typedef esp_err_t biodyn_imu_err_t;
 #define BIODYN_IMU_ERR_WRONG_WHOAMI 0x8
 #define BIODYN_IMU_ERR_COULDNT_CONFIGURE 0x10
 #define BIODYN_IMU_ERR_COULDNT_READ 0x20
-#define BIODYN_IMU_ERR_INVALID_ARGUMENT 0x5
+#define BIODYN_IMU_ERR_INVALID_ARGUMENT 0x40
+#define BIODYN_IMU_ERR_NO_EXT_ACK 0x80
+#define BIODYN_IMU_ERR_COULDNT_INIT_MAG 0x100
 
 // Initializes the IMU
 biodyn_imu_err_t biodyn_imu_icm20948_init();

@@ -3,6 +3,7 @@
 
 #include "constants.h"
 #include "bluetooth/ble.h"
+#include "system/led.h"
 #include "system/self_test.h"
 
 const static struct biodyn_ble_characteristic self_test_chars[] = {
@@ -20,7 +21,16 @@ const static struct biodyn_ble_characteristic self_test_chars[] = {
 		.permissions = BIODYN_PERM_READ,
 		.properties = BIODYN_PROP_READ,
 		.get_data = self_test_get_err_msg,
-	}};
+	},
+	{
+		.name = "LED Control",
+		.uuid = BIODYN_BLE_UUID_16(0x1A12),
+		.permissions = BIODYN_PERM_READ_WRITE,
+		.properties = BIODYN_PROP_READ_WRITE,
+		.set_data = led_set_state,
+		.get_data = led_get_state,
+	},
+};
 
 const static struct biodyn_ble_service self_test_service = {
 	.name = "Self Test Service",

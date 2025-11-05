@@ -25,7 +25,12 @@
 #define PWR_MGMT_1 0x06
 #define PWR_MGMT_2 0x07
 #define USER_CTRL 0x03
+#define INT_PIN_CFG 0x0F
 #define I2C_MST_STATUS 0x17
+
+#define I2C_SLV0_NACK 0x01
+#define I2C_SLV4_NACK 0x10
+#define I2C_SLV4_DONE 0x40
 
 #define TEMP_OUT_H 0x39
 #define TEMP_OUT_L 0x3a
@@ -78,7 +83,15 @@
 #define I2C_SLV0_CTRL 0X05
 #define I2C_SLV0_DO 0X06
 
-// #define AK09916_ADDRESS 0x0c
+#define I2C_SLV4_ADDR 0x13
+#define I2C_SLV4_REG 0x14
+#define I2C_SLV4_CTRL 0x15
+#define I2C_SLV4_DO 0x16
+#define I2C_SLV4_DI 0x17
+
+#define AK09916_ADDRESS 0x0c
+#define AK09916_ADDRESS_READ 0x8c
+#define AK09916_ADDRESS_WRITE 0x0c
 #define AK09916_WIA 0x01
 #define AK09916_STATUS1 0x10
 #define AK09916_HXL 0x11
@@ -90,6 +103,9 @@
 #define AK09916_STATUS2 0x18
 #define AK09916_CONTROL2 0x31
 #define AK09916_CONTROL3 0x32
+#define AK09916_READ 0x80
+#define AK09916_WRITE 0x7F
+#define AK09916_WHOAMI 0x01
 // #define AK09916_TEST1 0X33
 // #define AK09916_TEST2 0x34
 // Do not use these two registers above
