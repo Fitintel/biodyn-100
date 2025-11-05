@@ -195,4 +195,6 @@ biodyn_imu_err_t biodyn_imu_icm20948_config_gyro_sample_averaging(uint8_t gyro_s
 // TODO rest of functions for configuring IMU
 // TODO remove bias from gyro and mag
 
+// TEMP TEST FUNCTION
+biodyn_imu_err_t biodyn_imu_icm20948_test_gyro(uint8_t *out);
 #endif // ICM20948_DRIVER_H

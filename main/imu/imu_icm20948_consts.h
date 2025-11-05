@@ -1,6 +1,9 @@
 #ifndef IMU_ICM20948_CONSTANTS
 #define IMU_ICM20948_CONSTANTS
 
+#define ICM20948_ADDR 0x69
+#define AK09916_ADDR 0x0c
+
 #define IMU_WHOAMI 0x0
 #define LP_CONFIG 0x05
 #define ACCEL_XOUT_H 0x2d
@@ -46,6 +49,9 @@
 #define MAG_YOUT_L EXT_SLV_SENS_DATA_03
 #define MAG_ZOUT_H EXT_SLV_SENS_DATA_04
 #define MAG_ZOUT_L EXT_SLV_SENS_DATA_05
+
+#define FIFO_RST 0x68
+#define FIFO_MODE 0x69
 
 // Register bank 1
 #define SELF_TEST_X_GYRO 0x02
