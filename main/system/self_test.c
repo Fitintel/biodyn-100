@@ -4,6 +4,7 @@
 #include <string.h>
 #include "biodyn_systems.h"
 #include "system/led.h"
+#include "string.h"
 
 // TODO: self-testing
 
@@ -27,7 +28,7 @@ static struct
 	self_test_state state;
 	const biodyn_system *systems;
 	int n_systems;
-	const char *err_msg;
+	char err_msg[256];
 } self_test_data = {not_started, biodyn_systems, LEN_OF_STATIC_ARRAY(biodyn_systems), ""};
 
 /* ----------------------------
@@ -86,7 +87,7 @@ void self_test_start()
 		ESP_LOGI(ST_TAG, "Running self test for the first time");
 
 	self_test_data.state = running;
-	self_test_data.err_msg = "";
+	self_test_data.err_msg[0] = '\0';
 
 	// Run all the tests
 	for (int i = 0; i < self_test_data.n_systems; i++)
@@ -100,7 +101,9 @@ void self_test_start()
 			{
 				const char *msg = sys->get_error();
 				ESP_LOGE(ST_TAG, "System %s has error: %s", sys->name, msg);
-				self_test_data.err_msg = msg;
+				// Set error message
+				snprintf(self_test_data.err_msg, sizeof(self_test_data.err_msg),
+						 "System \"%s\" has error:\n%s", sys->name, msg);
 				self_test_data.state = completed_with_err;
 				return;
 			}
