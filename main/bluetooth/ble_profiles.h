@@ -1,7 +1,7 @@
 #ifndef BIODYN_BLE_PROFILES_H
 #define BIODYN_BLE_PROFILES_H
 
-#include "constants.h"
+#include "biodyn_constants.h"
 #include "bluetooth/ble.h"
 #include "bluetooth/device_information_service.h"
 #include "bluetooth/self_test_service.h"

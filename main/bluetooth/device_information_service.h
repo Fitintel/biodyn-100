@@ -1,7 +1,7 @@
 #ifndef BIODYN_DEVICE_INFORMATION_SERVICE_H
 #define BIODYN_DEVICE_INFORMATION_SERVICE_H
 
-#include "constants.h"
+#include "biodyn_constants.h"
 #include "bluetooth/ble.h"
 
 const static struct biodyn_ble_characteristic device_info_chars[] = {

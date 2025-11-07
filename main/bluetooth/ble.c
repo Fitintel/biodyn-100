@@ -22,7 +22,7 @@
 #include "sdkconfig.h"
 
 #include "bluetooth/ble.h"
-#include "constants.h"
+#include "biodyn_constants.h"
 
 /* ----------------------------
 		Data definitions

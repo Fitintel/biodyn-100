@@ -691,12 +691,12 @@ static biodyn_imu_err_t self_test_accel_gyro()
 
 	// Subtract sensor ouput st_off froms st_on
 	imu_motion_data deltas = {0};
-	deltas.accel_x = imd_st_on.accel_x - imd_st_off.accel_x;
-	deltas.accel_y = imd_st_on.accel_y - imd_st_off.accel_y;
-	deltas.accel_z = imd_st_on.accel_z - imd_st_off.accel_z;
-	deltas.gyro_x = imd_st_on.gyro_x - imd_st_off.gyro_x;
-	deltas.gyro_y = imd_st_on.gyro_y - imd_st_off.gyro_y;
-	deltas.gyro_z = imd_st_on.gyro_z - imd_st_off.gyro_z;
+	deltas.accel.x = imd_st_on.accel.x - imd_st_off.accel.x;
+	deltas.accel.y = imd_st_on.accel.y - imd_st_off.accel.y;
+	deltas.accel.z = imd_st_on.accel.z - imd_st_off.accel.z;
+	deltas.gyro.x = imd_st_on.gyro.x - imd_st_off.gyro.x;
+	deltas.gyro.y = imd_st_on.gyro.y - imd_st_off.gyro.y;
+	deltas.gyro.z = imd_st_on.gyro.z - imd_st_off.gyro.z;
 
 	// Obtain factory self_test results from icm20948 self_test registers to compare to.
 	uint8_t trimax = 0;
@@ -718,27 +718,27 @@ static biodyn_imu_err_t self_test_accel_gyro()
 	float RL = 0.5;
 	float RH = 1.5;
 	/** DEBUG*/
-	ESP_LOGI(TAG, "\n st_off ax: %f\n st_off ay: %f\n st_off az: %f\n st_off gx: %f\n st_off gy: %f\n st_off gz: %f", imd_st_off.accel_x, imd_st_off.accel_y, imd_st_off.accel_z, imd_st_off.gyro_x, imd_st_off.gyro_y, imd_st_off.gyro_z);
-	ESP_LOGI(TAG, "\n st_on ax: %f\n st_on ay: %f\n st_on az: %f\n st_on gx: %f\n st_on gy: %f\n st_on gz: %f", imd_st_on.accel_x, imd_st_on.accel_y, imd_st_on.accel_z, imd_st_on.gyro_x, imd_st_on.gyro_y, imd_st_on.gyro_z);
+	ESP_LOGI(TAG, "\n st_off ax: %f\n st_off ay: %f\n st_off az: %f\n st_off gx: %f\n st_off gy: %f\n st_off gz: %f", imd_st_off.accel.x, imd_st_off.accel.y, imd_st_off.accel.z, imd_st_off.gyro.x, imd_st_off.gyro.y, imd_st_off.gyro.z);
+	ESP_LOGI(TAG, "\n st_on ax: %f\n st_on ay: %f\n st_on az: %f\n st_on gx: %f\n st_on gy: %f\n st_on gz: %f", imd_st_on.accel.x, imd_st_on.accel.y, imd_st_on.accel.z, imd_st_on.gyro.x, imd_st_on.gyro.y, imd_st_on.gyro.z);
 
-	ESP_LOGI(TAG, "\n delta ax: %f\n delta ay: %f\n delta az: %f\n delta gx: %f\n delta gy: %f\n delta gz: %f", deltas.accel_x, deltas.accel_y, deltas.accel_z, deltas.gyro_x, deltas.gyro_y, deltas.gyro_z);
+	ESP_LOGI(TAG, "\n delta ax: %f\n delta ay: %f\n delta az: %f\n delta gx: %f\n delta gy: %f\n delta gz: %f", deltas.accel.x, deltas.accel.y, deltas.accel.z, deltas.gyro.x, deltas.gyro.y, deltas.gyro.z);
 	ESP_LOGI(TAG, "\n trimax: %d\ntrimay: %d\n trimaz: %d\n trimgx: %d\n trimgy: %d\n trimgz: %d", trimax, trimay, trimaz, trimgx, trimgy, trimgz);
 	/** DEBUG */
 
 	// CHECK if deltas-trim is between rangel*trim and rangeh*trim
 	// return error on fails
 	ESP_LOGI(TAG, "checking against trims");
-	if (RL * trimax < deltas.accel_x / (1 << accel_range_value) && RH * trimax > deltas.accel_x / (1 << accel_range_value))
+	if (RL * trimax < deltas.accel.x / (1 << accel_range_value) && RH * trimax > deltas.accel.x / (1 << accel_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on ax");
 	}
 	else
 	{
-		ESP_LOGE(TAG, "self test failed on delta ax with ax = %f and trimax = %d", deltas.accel_x, trimax);
+		ESP_LOGE(TAG, "self test failed on delta ax with ax = %f and trimax = %d", deltas.accel.x, trimax);
 		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on ax");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
-	if (RL * trimay < deltas.accel_y / (1 << accel_range_value) && RH * trimay > deltas.accel_y / (1 << accel_range_value))
+	if (RL * trimay < deltas.accel.y / (1 << accel_range_value) && RH * trimay > deltas.accel.y / (1 << accel_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on ay");
 	}
@@ -749,7 +749,7 @@ static biodyn_imu_err_t self_test_accel_gyro()
 		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on ay");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
-	if (RL * trimaz < deltas.accel_z / (1 << accel_range_value) && RH * trimaz > deltas.accel_z / (1 << accel_range_value))
+	if (RL * trimaz < deltas.accel.z / (1 << accel_range_value) && RH * trimaz > deltas.accel.z / (1 << accel_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on az");
 	}
@@ -759,41 +759,41 @@ static biodyn_imu_err_t self_test_accel_gyro()
 		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on az");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
-	if (RL * trimgx < deltas.gyro_x / (1 << gyro_range_value) && RH * trimgx > deltas.gyro_x / (1 << gyro_range_value))
+	if (RL * trimgx < deltas.gyro.x / (1 << gyro_range_value) && RH * trimgx > deltas.gyro.x / (1 << gyro_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on gx");
 	}
 	else
 	{
-		uint8_t and1 = RL * trimgx < deltas.gyro_x / (1 << gyro_range_value);
-		uint8_t and2 = RH * trimgx > deltas.gyro_x / (1 << gyro_range_value);
-		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro_x, trimgx);
+		uint8_t and1 = RL * trimgx < deltas.gyro.x / (1 << gyro_range_value);
+		uint8_t and2 = RH * trimgx > deltas.gyro.x / (1 << gyro_range_value);
+		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro.x, trimgx);
 		ESP_LOGE(TAG, "and1 = %d; and2 = %d", and1, and2);
 		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gx");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
-	if (RL * trimgy < deltas.gyro_y / (1 << gyro_range_value) && RH * trimgy > deltas.gyro_y / (1 << gyro_range_value))
+	if (RL * trimgy < deltas.gyro.y / (1 << gyro_range_value) && RH * trimgy > deltas.gyro.y / (1 << gyro_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on gy");
 	}
 	else
 	{
-		uint8_t and1 = RL * trimgy < deltas.gyro_y / (1 << gyro_range_value);
-		uint8_t and2 = RH * trimgy > deltas.gyro_y / (1 << gyro_range_value);
-		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro_y, trimgy);
+		uint8_t and1 = RL * trimgy < deltas.gyro.y / (1 << gyro_range_value);
+		uint8_t and2 = RH * trimgy > deltas.gyro.y / (1 << gyro_range_value);
+		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro.y, trimgy);
 		ESP_LOGE(TAG, "and1 = %d; and2 = %d", and1, and2);
 		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gy");
 		return BIODYN_IMU_ERR_COULDNT_CONFIGURE;
 	}
-	if (RL * trimgz < deltas.gyro_z / (1 << gyro_range_value) && RH * trimgz > deltas.gyro_z / (1 << gyro_range_value))
+	if (RL * trimgz < deltas.gyro.z / (1 << gyro_range_value) && RH * trimgz > deltas.gyro.z / (1 << gyro_range_value))
 	{
 		ESP_LOGI(TAG, "Self-test succesful for accel_gyro on gz");
 	}
 	else
 	{
-		uint8_t and1 = RL * trimgz < deltas.gyro_z / (1 << gyro_range_value);
-		uint8_t and2 = RH * trimgz > deltas.gyro_z / (1 << gyro_range_value);
-		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro_z, trimgy);
+		uint8_t and1 = RL * trimgz < deltas.gyro.z / (1 << gyro_range_value);
+		uint8_t and2 = RH * trimgz > deltas.gyro.z / (1 << gyro_range_value);
+		ESP_LOGE(TAG, "failed with delta_gx = %f and trimgx = %d", deltas.gyro.z, trimgy);
 		ESP_LOGE(TAG, "and1 = %d; and2 = %d", and1, and2);
 
 		collect_err(BIODYN_IMU_ERR_COULDNT_CONFIGURE, "SELF_TEST_ACCEL_GYRO: failed self-test on gz");
@@ -1036,9 +1036,9 @@ void biodyn_imu_icm20948_read_mag(uint16_t *size, void *out)
 
 	float *fout = (float *)out;
 	*size = 3 * sizeof(float);
-	fout[0] = imd.mag_x;
-	fout[1] = imd.mag_y;
-	fout[2] = imd.mag_z;
+	fout[0] = imd.mag.x;
+	fout[1] = imd.mag.y;
+	fout[2] = imd.mag.z;
 }
 
 /**
@@ -1092,17 +1092,17 @@ biodyn_imu_err_t biodyn_imu_icm20948_read_accel_gyro_mag(imu_motion_data *data)
 	// 21 is reserved,
 	// 22 is ST2
 
-	data->accel_x = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
-	data->accel_y = ((float)raw_ay / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
-	data->accel_z = ((float)raw_az / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
+	data->accel.x = ((float)raw_ax / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
+	data->accel.y = ((float)raw_ay / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
+	data->accel.z = ((float)raw_az / accel_sensitivity_scale_factor) * EARTH_GRAVITY;
 
-	data->gyro_x = (float)raw_gx / gyro_sensitivity_scale_factor;
-	data->gyro_y = (float)raw_gy / gyro_sensitivity_scale_factor;
-	data->gyro_z = (float)raw_gz / gyro_sensitivity_scale_factor;
+	data->gyro.x = (float)raw_gx / gyro_sensitivity_scale_factor;
+	data->gyro.y = (float)raw_gy / gyro_sensitivity_scale_factor;
+	data->gyro.z = (float)raw_gz / gyro_sensitivity_scale_factor;
 
-	data->mag_x = (float)raw_mx * MAG_SENSITIVITY_SCALE_FACTOR;
-	data->mag_y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
-	data->mag_z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->mag.x = (float)raw_mx * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->mag.y = (float)raw_my * MAG_SENSITIVITY_SCALE_FACTOR;
+	data->mag.z = (float)raw_mz * MAG_SENSITIVITY_SCALE_FACTOR;
 
 	uint8_t st1 = out[14];
 	// ESP_LOGI(TAG, "Read ST1 as %02x", st1);

@@ -1,7 +1,7 @@
 #ifndef BIODYN_SELF_TEST_BLE_SERVICE
 #define BIODYN_SELF_TEST_BLE_SERVICE
 
-#include "constants.h"
+#include "biodyn_constants.h"
 #include "bluetooth/ble.h"
 #include "system/led.h"
 #include "system/self_test.h"

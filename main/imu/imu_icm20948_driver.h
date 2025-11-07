@@ -4,7 +4,8 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
-#include "constants.h"
+#include "biodyn_constants.h"
+#include "imu/linear.h"
 
 #define IMU_ACCEL_UNIT "m/s^2"
 #define IMU_GYRO_UNIT "dps"
@@ -12,15 +13,9 @@
 
 typedef struct
 {
-	float accel_x;
-	float accel_y;
-	float accel_z;
-	float gyro_x;
-	float gyro_y;
-	float gyro_z;
-	float mag_x;
-	float mag_y;
-	float mag_z;
+	float3 accel;
+	float3 gyro;
+	float3 mag;
 } imu_motion_data;
 
 typedef enum
@@ -46,14 +41,6 @@ typedef enum
 	_b2 = 2,
 	_b3 = 3,
 } user_bank_range;
-
-struct imu_float3
-{
-	float x;
-	float y;
-	float z;
-};
-typedef struct imu_float3 imu_float3_t;
 
 /**
  * SPI pins for a device

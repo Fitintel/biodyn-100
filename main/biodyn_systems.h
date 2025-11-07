@@ -1,7 +1,7 @@
 #ifndef BIODYN_SYSTEM_COLLECTION
 #define BIODYN_SYSTEM_COLLECTION
 
-#include "constants.h"
+#include "biodyn_constants.h"
 #include "system/time_sync.h"
 #include "system/led.h"
 #include "imu/imu_icm20948_driver.h"

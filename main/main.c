@@ -14,7 +14,7 @@
 
 #include "sdkconfig.h"
 
-#include "constants.h"
+#include "biodyn_constants.h"
 #include "system/nvs.h"
 #include "bluetooth/ble.h"
 #include "bluetooth/ble_profiles.h"
@@ -62,25 +62,4 @@ void app_main(void)
 
 	// Set up!
 	ESP_LOGI(MAIN_TAG, "Finished setup");
-
-	//test_accel_gyro_mag_imu_icm20948();
-}
-
-void test_accel_gyro_mag_imu_icm20948()
-{
-	imu_motion_data data = {0};
-	for (int i = 0; i < 2000; ++i)
-	{
-		biodyn_imu_icm20948_read_accel_gyro_mag(&data);
-		ESP_LOGI(MAIN_TAG, "ACCEL X: %.6f %s", data.accel_x, IMU_ACCEL_UNIT);
-		ESP_LOGI(MAIN_TAG, "ACCEL Y: %.6f %s", data.accel_y, IMU_ACCEL_UNIT);
-		ESP_LOGI(MAIN_TAG, "ACCEL Z: %.6f %s", data.accel_z, IMU_ACCEL_UNIT);
-		ESP_LOGI(MAIN_TAG, "GYRO X: %.6f %s", data.gyro_x, IMU_GYRO_UNIT);
-		ESP_LOGI(MAIN_TAG, "GYRO Y: %.6f %s", data.gyro_y, IMU_GYRO_UNIT);
-		ESP_LOGI(MAIN_TAG, "GYRO Z: %.6f %s", data.gyro_z, IMU_GYRO_UNIT);
-		ESP_LOGI(MAIN_TAG, "MAG X: %.6f %s", data.mag_x, IMU_MAG_UNIT);
-		ESP_LOGI(MAIN_TAG, "MAG Y: %.6f %s", data.mag_y, IMU_MAG_UNIT);
-		ESP_LOGI(MAIN_TAG, "MAG Z: %.6f %s", data.mag_z, IMU_MAG_UNIT);
-		vTaskDelay(pdMS_TO_TICKS(100)); // Sleep for 100 ms (0.1 second)
-	}
 }

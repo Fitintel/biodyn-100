@@ -9,16 +9,25 @@
 #define TAG "DATA_FAST"
 #define IMU_DATA_CNT 10
 
+// A timed IMU + EMG read
 typedef struct
 {
-	ts_ticker_t ticker;	  // ----  8 bytes
-	imu_motion_data data; // -- 36 bytes
-	float emg;			  // -------------  4 bytes
+	ts_ticker_t ticker;	  // 8 bytes
+	imu_motion_data data; // 36 bytes
+	float emg;			  // 4 bytes
 } timed_read;			  // TOTAL: 48 bytes aligned on 8
+
+// A timed orientation of the device
+typedef struct
+{
+	ts_ticker_t ticker;
+	quaternion orientation;
+} timed_orientation;
 
 static struct
 {
-	timed_read data[IMU_DATA_CNT];
+	timed_read raw_data[IMU_DATA_CNT];
+	timed_orientation orientation[IMU_DATA_CNT];
 	SemaphoreHandle_t data_mutex;
 	int data_cnt;
 	int data_ptr;
@@ -28,6 +37,9 @@ static struct
 	char ext_err_msg[128];
 	biodyn_df_err_t ext_err;
 	double max_read_delay_before_err;
+
+	float3 gyro_bias;
+	quaternion curr_orientation;
 } data_fast = {
 	.data_cnt = IMU_DATA_CNT,
 	.data_ptr = 0,
@@ -35,9 +47,12 @@ static struct
 	.data_mutex = NULL,
 	.ext_err = BIODYN_DATAFAST_OK,
 	.max_read_delay_before_err = 15,
+	.gyro_bias = {0, 0, 0},
+	.curr_orientation = {1, 0, 0, 0},
 };
 
 static esp_err_t collect_err(biodyn_timesync_err_t err, const char *msg, esp_err_t code);
+static quaternion mahony_fusion(const imu_motion_data *data, quaternion orientation, float dt);
 
 void read_task(void *usr_data)
 {
@@ -60,7 +75,9 @@ void read_task(void *usr_data)
 			snprintf(data_fast.ext_err_msg, sizeof(data_fast.ext_err_msg),
 					 "DataFast trying to run at %.1lfms, instead is %.1lfms",
 					 data_fast.max_read_delay_before_err, read_time_ms);
-		} else {
+		}
+		else
+		{
 			data_fast.ext_err &= ~BIODYN_DATAFAST_RUNNING_TOO_SLOW;
 		}
 	}
@@ -108,6 +125,7 @@ const char *biodyn_data_fast_get_error()
 	return "No error";
 }
 
+// Read data from IMU, store it, and calculate orientation
 void data_fast_read()
 {
 	ts_ticker_t read_ticker = biodyn_time_sync_get_ticker();
@@ -119,16 +137,26 @@ void data_fast_read()
 	// Take mutex
 	if (xSemaphoreTake(data_fast.data_mutex, portMAX_DELAY))
 	{
+		float elapsed = fmin(ts_ticker_t_to_ms(read_ticker - data_fast.orientation[data_fast.data_ptr].ticker) / 1000.0f, 0.1f);
 		data_fast.data_ptr += 1;
 		data_fast.data_ptr %= data_fast.data_cnt;
-		timed_read *datapoint = &data_fast.data[data_fast.data_ptr];
+
+		// Update raw data
+		timed_read *datapoint = &data_fast.raw_data[data_fast.data_ptr];
 		datapoint->ticker = read_ticker;
 		datapoint->data = data;
 		datapoint->emg = 0;
+
+		// Update orientation
+		timed_orientation *orient_point = &data_fast.orientation[data_fast.data_ptr];
+		orient_point->ticker = read_ticker;
+		orient_point->orientation = mahony_fusion(&data, data_fast.curr_orientation, elapsed);
+
 		xSemaphoreGive(data_fast.data_mutex); // Give mutex
 	}
 }
 
+// Bluetooth callback to get packed raw data
 void ble_data_fast_packed(uint16_t *size, void *out)
 {
 	// Take mutex
@@ -136,7 +164,7 @@ void ble_data_fast_packed(uint16_t *size, void *out)
 	{
 		int current_size = data_fast.data_ptr;
 		int old_size = data_fast.data_cnt - data_fast.data_ptr;
-		timed_read *p = &data_fast.data[0];
+		timed_read *p = &data_fast.raw_data[0];
 		memcpy(out + (old_size * sizeof(timed_read)), p, current_size * sizeof(timed_read));
 		memcpy(out, p, old_size * sizeof(timed_read));
 		*size = IMU_DATA_CNT * sizeof(timed_read);
@@ -144,6 +172,77 @@ void ble_data_fast_packed(uint16_t *size, void *out)
 		// ESP_LOGI(TAG, "x: %.2f, y: %.2f, z: %.2f at %lld", latest->data.accel_x, latest->data.accel_y, latest->data.accel_z, latest->ticker);
 		xSemaphoreGive(data_fast.data_mutex); // Give mutex
 	}
+}
+
+// Bluetooth call back to get packed orientation data
+void ble_data_fast_orientation_packed(uint16_t *size, void *out)
+{
+	// Take mutex
+	if (xSemaphoreTake(data_fast.data_mutex, portMAX_DELAY))
+	{
+		int current_size = data_fast.data_ptr;
+		int old_size = data_fast.data_cnt - data_fast.data_ptr;
+		timed_orientation *p = &data_fast.orientation[0];
+		memcpy(out + (old_size * sizeof(timed_orientation)), p, current_size * sizeof(timed_orientation));
+		memcpy(out, p, old_size * sizeof(timed_orientation));
+		*size = IMU_DATA_CNT * sizeof(timed_orientation);
+		xSemaphoreGive(data_fast.data_mutex); // Give mutex
+	}
+}
+
+static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float dt_s)
+{
+	// Convert gyro to radians
+	float3 gyro = data->gyro;
+	deg_to_rad_f3(&gyro);
+
+	// Normalize accelerometer measurement
+	float3 accel = data->accel;
+	normalize_f3(&accel);
+
+	// What should gravity look like?
+	float3 gravity = {
+		2 * (q.x * q.z - q.w * q.y),
+		2 * (q.w * q.x + q.y * q.z),
+		q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z};
+
+	// Compute error between measured and expected gravity
+	float3 error = cross_f3(&accel, &gravity);
+
+	// Keep internal bias
+	float ki = 0;
+	data_fast.gyro_bias.x += ki * error.x * dt_s;
+	data_fast.gyro_bias.y += ki * error.y * dt_s;
+	data_fast.gyro_bias.z += ki * error.z * dt_s;
+
+	// Adjust gyro with error
+	float kp = 2;
+	float3 gyro_corr = {
+		gyro.x + kp * error.x + data_fast.gyro_bias.x,
+		gyro.y + kp * error.y + data_fast.gyro_bias.y,
+		gyro.z + kp * error.z + data_fast.gyro_bias.z};
+
+	// Don't actually correct if accel is too much (>1g)
+	if (len_f3(&accel) > 1.2f)
+		gyro_corr = gyro;
+
+	// Update orientation quaternion, integrating current gyro
+	quaternion dq = {
+		-0.5 * (q.x * gyro_corr.x + q.y * gyro_corr.y + q.z * gyro_corr.z),
+		0.5 * (q.w * gyro_corr.x + q.y * gyro_corr.z - q.z * gyro_corr.y),
+		0.5 * (q.w * gyro_corr.y - q.x * gyro_corr.z + q.z * gyro_corr.x),
+		0.5 * (q.w * gyro_corr.z + q.x * gyro_corr.y - q.y * gyro_corr.x)};
+	quaternion q_next = {
+		q.w + dq.w * dt_s,
+		q.x + dq.x * dt_s,
+		q.y + dq.y * dt_s,
+		q.z + dq.z * dt_s};
+
+	// Normalize quaternion
+	normalize_quat(&q_next);
+
+	// TODO: add magnetometer correction
+	return q_next;
 }
 
 static esp_err_t collect_err(biodyn_df_err_t err, const char *msg, esp_err_t code)

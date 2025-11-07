@@ -1,7 +1,7 @@
 #ifndef BIODYN_100_TIME_SYNC_H
 #define BIODYN_100_TIME_SYNC_H
 
-#include "constants.h"
+#include "biodyn_constants.h"
 #include "esp_system.h"
 
 typedef uint64_t ts_ticker_t;
