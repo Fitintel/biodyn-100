@@ -27,6 +27,7 @@ typedef struct
 
 static struct
 {
+	// Rolling data storage
 	timed_read raw_data[IMU_DATA_CNT];
 	SemaphoreHandle_t data_mutex;
 	int data_cnt;
@@ -34,12 +35,16 @@ static struct
 
 	TaskHandle_t read_task;
 
+	// Error things
 	char ext_err_msg[128];
 	biodyn_df_err_t ext_err;
 	double max_read_delay_before_err;
 
+	// Mahony fusion things
 	float3 gyro_bias;
 	quaternion curr_orientation;
+	float ki;
+	float kp;
 } data_fast = {
 	.data_cnt = IMU_DATA_CNT,
 	.data_ptr = 0,
@@ -49,6 +54,8 @@ static struct
 	.max_read_delay_before_err = 15,
 	.gyro_bias = {0, 0, 0},
 	.curr_orientation = {1, 0, 0, 0},
+	.ki = 0.0f,
+	.kp = 2.0f,
 };
 
 static esp_err_t collect_err(biodyn_timesync_err_t err, const char *msg, esp_err_t code);
@@ -145,6 +152,7 @@ void data_fast_read()
 		datapoint->data = data;
 		datapoint->emg = 0;
 		datapoint->orientation = mahony_fusion(&data, data_fast.curr_orientation, elapsed);
+		data_fast.curr_orientation = datapoint->orientation;
 
 		xSemaphoreGive(data_fast.data_mutex); // Give mutex
 	}
@@ -188,20 +196,20 @@ static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float
 	float3 error = cross_f3(&accel, &gravity);
 
 	// Keep internal bias
-	float ki = 0;
+	float ki = data_fast.ki;
 	data_fast.gyro_bias.x += ki * error.x * dt_s;
 	data_fast.gyro_bias.y += ki * error.y * dt_s;
 	data_fast.gyro_bias.z += ki * error.z * dt_s;
 
 	// Adjust gyro with error
-	float kp = 2;
+	float kp = data_fast.kp;
 	float3 gyro_corr = {
 		gyro.x + kp * error.x + data_fast.gyro_bias.x,
 		gyro.y + kp * error.y + data_fast.gyro_bias.y,
 		gyro.z + kp * error.z + data_fast.gyro_bias.z};
 
 	// Don't actually correct if accel is too much (>1g)
-	if (len_f3(&accel) > 1.2f)
+	if (len_f3(&data->accel) > 11.f)
 		gyro_corr = gyro;
 
 	// Update orientation quaternion, integrating current gyro
