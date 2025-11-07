@@ -2,6 +2,12 @@
 
 This repo holds firmware for the BIODYN-100.
 
+## Built With
+- C
+- ESP-IDF
+- FreeRTOS
+- Bluedroid
+
 ## Building & Flashing
 1. Source ESP-IDF with `. $HOME/esp/esp-idf/export.sh` or manually. Ensure ESP-IDF is installed on your device properly.
 2. Ensure the target it set with `idf.py set-target ESP32-S3`.
