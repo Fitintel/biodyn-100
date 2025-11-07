@@ -7,15 +7,16 @@
 #include "system/time_sync.h"
 
 #define TAG "DATA_FAST"
-#define IMU_DATA_CNT 10
+#define IMU_DATA_CNT 7
 
 // A timed IMU + EMG read
 typedef struct
 {
-	ts_ticker_t ticker;	  // 8 bytes
-	imu_motion_data data; // 36 bytes
-	float emg;			  // 4 bytes
-} timed_read;			  // TOTAL: 48 bytes aligned on 8
+	ts_ticker_t ticker;		// 8 bytes
+	imu_motion_data data;	// 36 bytes
+	float emg;				// 4 bytes
+	quaternion orientation; // 16 bytes
+} timed_read;				// TOTAL: 64 bytes aligned on 8
 
 // A timed orientation of the device
 typedef struct
@@ -27,7 +28,6 @@ typedef struct
 static struct
 {
 	timed_read raw_data[IMU_DATA_CNT];
-	timed_orientation orientation[IMU_DATA_CNT];
 	SemaphoreHandle_t data_mutex;
 	int data_cnt;
 	int data_ptr;
@@ -137,20 +137,14 @@ void data_fast_read()
 	// Take mutex
 	if (xSemaphoreTake(data_fast.data_mutex, portMAX_DELAY))
 	{
-		float elapsed = fmin(ts_ticker_t_to_ms(read_ticker - data_fast.orientation[data_fast.data_ptr].ticker) / 1000.0f, 0.1f);
+		float elapsed = fmin(ts_ticker_t_to_ms(read_ticker - data_fast.raw_data[data_fast.data_ptr].ticker) / 1000.0f, 0.1f);
 		data_fast.data_ptr += 1;
 		data_fast.data_ptr %= data_fast.data_cnt;
-
-		// Update raw data
 		timed_read *datapoint = &data_fast.raw_data[data_fast.data_ptr];
 		datapoint->ticker = read_ticker;
 		datapoint->data = data;
 		datapoint->emg = 0;
-
-		// Update orientation
-		timed_orientation *orient_point = &data_fast.orientation[data_fast.data_ptr];
-		orient_point->ticker = read_ticker;
-		orient_point->orientation = mahony_fusion(&data, data_fast.curr_orientation, elapsed);
+		datapoint->orientation = mahony_fusion(&data, data_fast.curr_orientation, elapsed);
 
 		xSemaphoreGive(data_fast.data_mutex); // Give mutex
 	}
@@ -170,22 +164,6 @@ void ble_data_fast_packed(uint16_t *size, void *out)
 		*size = IMU_DATA_CNT * sizeof(timed_read);
 		// timed_read *latest = &((timed_read *)out)[IMU_DATA_CNT - 1];
 		// ESP_LOGI(TAG, "x: %.2f, y: %.2f, z: %.2f at %lld", latest->data.accel_x, latest->data.accel_y, latest->data.accel_z, latest->ticker);
-		xSemaphoreGive(data_fast.data_mutex); // Give mutex
-	}
-}
-
-// Bluetooth call back to get packed orientation data
-void ble_data_fast_orientation_packed(uint16_t *size, void *out)
-{
-	// Take mutex
-	if (xSemaphoreTake(data_fast.data_mutex, portMAX_DELAY))
-	{
-		int current_size = data_fast.data_ptr;
-		int old_size = data_fast.data_cnt - data_fast.data_ptr;
-		timed_orientation *p = &data_fast.orientation[0];
-		memcpy(out + (old_size * sizeof(timed_orientation)), p, current_size * sizeof(timed_orientation));
-		memcpy(out, p, old_size * sizeof(timed_orientation));
-		*size = IMU_DATA_CNT * sizeof(timed_orientation);
 		xSemaphoreGive(data_fast.data_mutex); // Give mutex
 	}
 }

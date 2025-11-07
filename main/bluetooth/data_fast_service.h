@@ -29,14 +29,8 @@ const static struct biodyn_ble_characteristic data_fast_chars[] = {
 		.properties = BIODYN_PROP_READ_WRITE,
 		.set_data = ble_time_sync_rtt_write,
 		.get_data = ble_time_sync_rtt_read,
-	},
-	{
-		.name = "Orientation",
-		.uuid = BIODYN_BLE_UUID_16(0x4159),
-		.permissions = BIODYN_PERM_READ,
-		.properties = BIODYN_PROP_READ,
-		.get_data = ble_data_fast_orientation_packed,
-	}};
+	}
+};
 
 const static struct biodyn_ble_service data_fast_service = {
 	.name = "Data Fast Service",
