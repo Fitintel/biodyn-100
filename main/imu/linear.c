@@ -44,3 +44,29 @@ void normalize_quat(quaternion *q)
 		q->w /= length;
 	}
 }
+
+float3 rotate_f3_by_quat(const float3 *v, const quaternion *q)
+{
+	quaternion v_q = {0, v->x, v->y, v->z};
+	quaternion q_conj = {q->w, -q->x, -q->y, -q->z};
+
+	quaternion temp = {
+		q->w * v_q.w - q->x * v_q.x - q->y * v_q.y - q->z * v_q.z,
+		q->w * v_q.x + q->x * v_q.w + q->y * v_q.z - q->z * v_q.y,
+		q->w * v_q.y - q->x * v_q.z + q->y * v_q.w + q->z * v_q.x,
+		q->w * v_q.z + q->x * v_q.y - q->y * v_q.x + q->z * v_q.w};
+	quaternion result = {
+		temp.w * q_conj.w - temp.x * q_conj.x - temp.y * q_conj.y - temp.z * q_conj.z,
+		temp.w * q_conj.x + temp.x * q_conj.w + temp.y * q_conj.z - temp.z * q_conj.y,
+		temp.w * q_conj.y - temp.x * q_conj.z + temp.y * q_conj.w + temp.z * q_conj.x,
+		temp.w * q_conj.z + temp.x * q_conj.y - temp.y * q_conj.x + temp.z * q_conj.w};
+
+	float3 rotated_v = {result.x, result.y, result.z};
+	return rotated_v;
+}
+
+quaternion conj_quat(const quaternion *q)
+{
+	quaternion conj = {q->w, -q->x, -q->y, -q->z};
+	return conj;
+}

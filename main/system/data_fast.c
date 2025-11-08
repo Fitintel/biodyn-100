@@ -54,7 +54,7 @@ static struct
 	.max_read_delay_before_err = 15,
 	.gyro_bias = {0, 0, 0},
 	.curr_orientation = {1, 0, 0, 0},
-	.ki = 0.0f,
+	.ki = 0.1f,
 	.kp = 2.0f,
 };
 
@@ -116,7 +116,6 @@ esp_err_t biodyn_data_fast_init()
 
 esp_err_t biodyn_data_fast_self_test()
 {
-
 	return biodyn_data_fast_has_error() ? -1 : ESP_OK;
 }
 
@@ -195,6 +194,27 @@ static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float
 	// Compute error between measured and expected gravity
 	float3 error = cross_f3(&accel, &gravity);
 
+	// Only add mag correction if mag isn't going crazy
+	if (len_f3(&data->mag) < 125.f)
+	{
+		// Normalize mag measurement
+		float3 mag = data->mag;
+		normalize_f3(&mag);
+		// Rotate mag to earth frame
+		float3 mag_earth = rotate_f3_by_quat(&mag, &q);
+		// Get reference mag
+		float3 mag_ref = {
+			sqrtf(mag_earth.x * mag_earth.x + mag_earth.y * mag_earth.y),
+			0,
+			mag_earth.z};
+		// Compute error between measured and expected mag
+		float3 mag_error = cross_f3(&mag, &mag_ref);
+		// Add to total error
+		error.x += mag_error.x;
+		error.y += mag_error.y;
+		error.z += mag_error.z;
+	}
+
 	// Keep internal bias
 	float ki = data_fast.ki;
 	data_fast.gyro_bias.x += ki * error.x * dt_s;
@@ -227,7 +247,6 @@ static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float
 	// Normalize quaternion
 	normalize_quat(&q_next);
 
-	// TODO: add magnetometer correction
 	return q_next;
 }
 
