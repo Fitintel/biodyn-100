@@ -195,25 +195,25 @@ static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float
 	float3 error = cross_f3(&accel, &gravity);
 
 	// Only add mag correction if mag isn't going crazy
-	if (len_f3(&data->mag) < 125.f)
-	{
-		// Normalize mag measurement
-		float3 mag = data->mag;
-		normalize_f3(&mag);
-		// Rotate mag to earth frame
-		float3 mag_earth = rotate_f3_by_quat(&mag, &q);
-		// Get reference mag
-		float3 mag_ref = {
-			sqrtf(mag_earth.x * mag_earth.x + mag_earth.y * mag_earth.y),
-			0,
-			mag_earth.z};
-		// Compute error between measured and expected mag
-		float3 mag_error = cross_f3(&mag, &mag_ref);
-		// Add to total error
-		error.x += mag_error.x;
-		error.y += mag_error.y;
-		error.z += mag_error.z;
-	}
+	// if (len_f3(&data->mag) < 125.f)
+	// {
+	// 	// Normalize mag measurement
+	// 	float3 mag = data->mag;
+	// 	normalize_f3(&mag);
+	// 	// Rotate mag to earth frame
+	// 	float3 mag_earth = rotate_f3_by_quat(&mag, &q);
+	// 	// Get reference mag
+	// 	float3 mag_ref = {
+	// 		sqrtf(mag_earth.x * mag_earth.x + mag_earth.y * mag_earth.y),
+	// 		0,
+	// 		mag_earth.z};
+	// 	// Compute error between measured and expected mag
+	// 	float3 mag_error = cross_f3(&mag, &mag_ref);
+	// 	// Add to total error
+	// 	error.x += mag_error.x;
+	// 	error.y += mag_error.y;
+	// 	error.z += mag_error.z;
+	// }
 
 	// Keep internal bias
 	float ki = data_fast.ki;
