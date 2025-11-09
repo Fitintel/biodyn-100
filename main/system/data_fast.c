@@ -2,6 +2,7 @@
 #include "imu/imu_icm20948_driver.h"
 #include "string.h"
 #include "freertos/FreeRTOS.h"
+#include "driver/gptimer.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "system/time_sync.h"
@@ -18,13 +19,6 @@ typedef struct
 	quaternion orientation; // 16 bytes
 } timed_read;				// TOTAL: 64 bytes aligned on 8
 
-// A timed orientation of the device
-typedef struct
-{
-	ts_ticker_t ticker;
-	quaternion orientation;
-} timed_orientation;
-
 static struct
 {
 	// Rolling data storage
@@ -33,22 +27,25 @@ static struct
 	int data_cnt;
 	int data_ptr;
 
+	// Read task things
+	gptimer_handle_t read_timer;
 	TaskHandle_t read_task;
 
 	// Error things
 	char ext_err_msg[128];
 	biodyn_df_err_t ext_err;
-	double max_read_delay_before_err;
+	double max_read_delay_before_err; // in ms
 
 	// Mahony fusion things
-	float3 gyro_bias;
 	quaternion curr_orientation;
+	float3 gyro_bias;
 	float ki;
 	float kp;
 } data_fast = {
 	.data_cnt = IMU_DATA_CNT,
 	.data_ptr = 0,
 	.read_task = NULL,
+	.read_timer = NULL,
 	.data_mutex = NULL,
 	.ext_err = BIODYN_DATAFAST_OK,
 	.max_read_delay_before_err = 15,
@@ -61,37 +58,60 @@ static struct
 static esp_err_t collect_err(biodyn_timesync_err_t err, const char *msg, esp_err_t code);
 static quaternion mahony_fusion(const imu_motion_data *data, quaternion orientation, float dt);
 
+// Hardware timer ISR that signals the read task it can keep reading
+static bool alarm_isr_cb(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_data)
+{
+	// Wake up read task
+	vTaskNotifyGiveFromISR(data_fast.read_task, NULL);
+	return false;
+}
+
+// Our polling task which reads data at fixed intervals signelled by hardware timer
 void read_task(void *usr_data)
 {
-	TickType_t last_wake_time = xTaskGetTickCount();
-	// This is the fastest we can go without gptimer or increasing tick rate
-	const TickType_t period = pdMS_TO_TICKS(10);
+	ts_ticker_t last_tick = biodyn_time_sync_get_ticker();
 
+	const int CHECK_SPEED_EVERY_N = 100;
+	int speed_check_ctr = 0;
 	for (;;)
 	{
-		ts_ticker_t tick_before = biodyn_time_sync_get_ticker();
+		// Drop pending requests
+		ulTaskNotifyTake(pdTRUE, 0);
+		// Wait until timer signals us
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+		// Read timestamp before reading data
+		ts_ticker_t current_tick = biodyn_time_sync_get_ticker();
+		// Read data
 		data_fast_read();
-		vTaskDelayUntil(&last_wake_time, period);
 
 		// Ensure we're reading fast enough
-		ts_ticker_t tick_after = biodyn_time_sync_get_ticker();
-		double read_time_ms = ts_ticker_t_to_ms(tick_after - tick_before);
-		if (read_time_ms > data_fast.max_read_delay_before_err)
+		if ((++speed_check_ctr) >= CHECK_SPEED_EVERY_N)
 		{
-			data_fast.ext_err |= BIODYN_DATAFAST_RUNNING_TOO_SLOW;
-			snprintf(data_fast.ext_err_msg, sizeof(data_fast.ext_err_msg),
-					 "DataFast trying to run at %.1lfms, instead is %.1lfms",
-					 data_fast.max_read_delay_before_err, read_time_ms);
+			double read_time_ms = ts_ticker_t_to_ms(current_tick - last_tick);
+			if (read_time_ms > data_fast.max_read_delay_before_err)
+			{
+				// We're going slow, add error
+				data_fast.ext_err |= BIODYN_DATAFAST_RUNNING_TOO_SLOW;
+				snprintf(data_fast.ext_err_msg, sizeof(data_fast.ext_err_msg),
+						 "DataFast trying to run at %.1lfms, instead is %.1lfms",
+						 data_fast.max_read_delay_before_err, read_time_ms);
+			}
+			else
+			{
+				// We're fine, clear error
+				data_fast.ext_err &= ~BIODYN_DATAFAST_RUNNING_TOO_SLOW;
+			}
+			speed_check_ctr = 0;
 		}
-		else
-		{
-			data_fast.ext_err &= ~BIODYN_DATAFAST_RUNNING_TOO_SLOW;
-		}
+		last_tick = current_tick;
 	}
 }
 
 esp_err_t biodyn_data_fast_init()
 {
+	data_fast.ext_err = BIODYN_DATAFAST_OK;
+
 	// Check if we can transmit our data
 	int data_len = IMU_DATA_CNT * sizeof(timed_read);
 	ESP_LOGI(TAG, "Data len is %d from %d datapoints of size %d bytes", data_len, IMU_DATA_CNT, sizeof(timed_read));
@@ -103,13 +123,44 @@ esp_err_t biodyn_data_fast_init()
 	if (data_fast.data_mutex == NULL)
 		collect_err(BIODYN_DATAFAST_COULDNT_CREATE_MUTEX, "Couldn't create mutex: ", -1);
 
-	// Create read task
-	BaseType_t res = xTaskCreate(read_task, TAG, 4096, NULL, 5, &data_fast.read_task);
+	// Create read task with high priority
+	BaseType_t res = xTaskCreate(read_task, TAG, 4096, NULL, 7, &data_fast.read_task);
 	if (res != pdTRUE)
 	{
 		collect_err(BIODYN_DATAFAST_COULDNT_CREATE_TASK, "Couldn't create task: code", res);
 		return -1;
 	}
+
+	// Create hardware timer
+	gptimer_config_t cfg = {
+		.clk_src = GPTIMER_CLK_SRC_DEFAULT,
+		.direction = GPTIMER_COUNT_UP,
+		.resolution_hz = 1 * 1000 * 1000, // 1 MHz resolution
+	};
+	if ((res = gptimer_new_timer(&cfg, &data_fast.read_timer)) != ESP_OK)
+		return collect_err(BIODYN_DATAFAST_COULDNT_CREATE_TIMER, "Could not create gptimer: code", res);
+
+	// Configure alarm
+	gptimer_alarm_config_t alarm_config = {
+		.reload_count = 0,					// Restart at 0
+		.alarm_count = 7000,				// 7 ms at 1 MHz
+		.flags.auto_reload_on_alarm = true, // Auto reload on alarm
+	};
+	if ((res = gptimer_set_alarm_action(data_fast.read_timer, &alarm_config)) != ESP_OK)
+		return collect_err(BIODYN_DATAFAST_COULDNT_CREATE_TIMER, "Could not set gptimer alarm config: code", res);
+
+	// Add timer alarm to trigger task
+	gptimer_event_callbacks_t cbs = {
+		.on_alarm = alarm_isr_cb,
+	};
+	if ((res = gptimer_register_event_callbacks(data_fast.read_timer, &cbs, NULL)) != ESP_OK)
+		return collect_err(BIODYN_DATAFAST_COULDNT_CREATE_TIMER, "Could not register gptimer callbacks: code", res);
+
+	// Enable and start timer
+	if ((res = gptimer_enable(data_fast.read_timer)) != ESP_OK)
+		return collect_err(BIODYN_DATAFAST_COULDNT_CREATE_TIMER, "Could not enable gptimer: code", res);
+	if ((res = gptimer_start(data_fast.read_timer)) != ESP_OK)
+		return collect_err(BIODYN_DATAFAST_COULDNT_CREATE_TIMER, "Could not start gptimer: code", res);
 
 	return ESP_OK;
 }
@@ -175,6 +226,7 @@ void ble_data_fast_packed(uint16_t *size, void *out)
 	}
 }
 
+// Mahony fusion implementation generating orientation quaternion from IMU data
 static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float dt_s)
 {
 	// Convert gyro to radians
@@ -185,7 +237,7 @@ static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float
 	float3 accel = data->accel;
 	normalize_f3(&accel);
 
-	// What should gravity look like?
+	// Calcculate what gravity should be under our current oritentation
 	float3 gravity = {
 		2 * (q.x * q.z - q.w * q.y),
 		2 * (q.w * q.x + q.y * q.z),
@@ -195,6 +247,7 @@ static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float
 	float3 error = cross_f3(&accel, &gravity);
 
 	// Only add mag correction if mag isn't going crazy
+	// TODO: re-enable mag correction when mag is stable
 	// if (len_f3(&data->mag) < 125.f)
 	// {
 	// 	// Normalize mag measurement
@@ -215,13 +268,13 @@ static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float
 	// 	error.z += mag_error.z;
 	// }
 
-	// Keep internal bias
+	// Keep internal gyro bias to offset by
 	float ki = data_fast.ki;
 	data_fast.gyro_bias.x += ki * error.x * dt_s;
 	data_fast.gyro_bias.y += ki * error.y * dt_s;
 	data_fast.gyro_bias.z += ki * error.z * dt_s;
 
-	// Adjust gyro with error
+	// Compute gyro correction based on bias and gravitational error
 	float kp = data_fast.kp;
 	float3 gyro_corr = {
 		gyro.x + kp * error.x + data_fast.gyro_bias.x,
@@ -233,11 +286,13 @@ static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float
 		gyro_corr = gyro;
 
 	// Update orientation quaternion, integrating current gyro
+	// Differential value
 	quaternion dq = {
 		-0.5 * (q.x * gyro_corr.x + q.y * gyro_corr.y + q.z * gyro_corr.z),
 		0.5 * (q.w * gyro_corr.x + q.y * gyro_corr.z - q.z * gyro_corr.y),
 		0.5 * (q.w * gyro_corr.y - q.x * gyro_corr.z + q.z * gyro_corr.x),
 		0.5 * (q.w * gyro_corr.z + q.x * gyro_corr.y - q.y * gyro_corr.x)};
+	// Integrate differential value into quaternion
 	quaternion q_next = {
 		q.w + dq.w * dt_s,
 		q.x + dq.x * dt_s,
@@ -247,6 +302,7 @@ static quaternion mahony_fusion(const imu_motion_data *data, quaternion q, float
 	// Normalize quaternion
 	normalize_quat(&q_next);
 
+	// All done updating quaternion
 	return q_next;
 }
 

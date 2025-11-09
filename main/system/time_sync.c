@@ -9,13 +9,11 @@
 
 static struct
 {
-	TaskHandle_t ticker_task;
 	gptimer_handle_t ticker_timer;
 	biodyn_timesync_err_t ext_err;
 	char ext_err_msg[128];
 	ts_ticker_t rtt;
 } time_sync = {
-	.ticker_task = NULL,
 	.ticker_timer = NULL,
 	.ext_err = BIODYN_TIMESYNC_OK,
 	.rtt = 0,
