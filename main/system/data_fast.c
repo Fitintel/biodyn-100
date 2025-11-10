@@ -52,12 +52,12 @@ static struct
 	.read_timer = NULL,
 	.data_mutex = NULL,
 	.ext_err = BIODYN_DATAFAST_OK,
-	.max_read_delay_before_err = 10,
+	.max_read_delay_before_err = 15,
 	.gyro_bias = {0, 0, 0},
 	.curr_orientation = {1, 0, 0, 0},
-	.ki = 0.1f,		// Mahony integral gain
-	.kp = 2.0f,		// Mahony proportional gain
-	.read_hz = 100, // Target read hz
+	.ki = 0.07f,	// Mahony integral gain
+	.kp = 2.1f,		// Mahony proportional gain
+	.read_hz = 105, // Target read hz
 	.datapoints_since_ble_read = 0,
 };
 

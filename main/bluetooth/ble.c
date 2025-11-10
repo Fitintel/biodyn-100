@@ -520,7 +520,7 @@ void biodyn_ble_handle_read(struct gatts_read_evt_param *re)
 	if (chr->response_type.auto_rsp == ESP_GATT_AUTO_RSP)
 		return;
 
-	ESP_LOGI(BIODYN_BLE_TAG, "Read request for characteristic \"%s\" in service \"%s\"", chr->name, chr->service->name);
+	ESP_LOGD(BIODYN_BLE_TAG, "Read request for characteristic \"%s\" in service \"%s\"", chr->name, chr->service->name);
 
 	// Get the data from the characteristic
 	if (!chr->get_data_fn)
