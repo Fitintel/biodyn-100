@@ -30,6 +30,7 @@ static struct
 	// Read task things
 	gptimer_handle_t read_timer;
 	TaskHandle_t read_task;
+	int read_hz;
 
 	// Error things
 	char ext_err_msg[128];
@@ -41,6 +42,9 @@ static struct
 	float3 gyro_bias;
 	float ki;
 	float kp;
+
+	// Track datapoints since last ble read
+	int datapoints_since_ble_read;
 } data_fast = {
 	.data_cnt = IMU_DATA_CNT,
 	.data_ptr = 0,
@@ -48,11 +52,13 @@ static struct
 	.read_timer = NULL,
 	.data_mutex = NULL,
 	.ext_err = BIODYN_DATAFAST_OK,
-	.max_read_delay_before_err = 15,
+	.max_read_delay_before_err = 10,
 	.gyro_bias = {0, 0, 0},
 	.curr_orientation = {1, 0, 0, 0},
-	.ki = 0.1f,
-	.kp = 2.0f,
+	.ki = 0.1f,		// Mahony integral gain
+	.kp = 2.0f,		// Mahony proportional gain
+	.read_hz = 100, // Target read hz
+	.datapoints_since_ble_read = 0,
 };
 
 static esp_err_t collect_err(biodyn_timesync_err_t err, const char *msg, esp_err_t code);
@@ -142,9 +148,9 @@ esp_err_t biodyn_data_fast_init()
 
 	// Configure alarm
 	gptimer_alarm_config_t alarm_config = {
-		.reload_count = 0,					// Restart at 0
-		.alarm_count = 7000,				// 7 ms at 1 MHz
-		.flags.auto_reload_on_alarm = true, // Auto reload on alarm
+		.reload_count = 0,							// Restart at 0
+		.alarm_count = 1000000 / data_fast.read_hz, // Alarm every 1/read_hz seconds
+		.flags.auto_reload_on_alarm = true,			// Auto reload on alarm
 	};
 	if ((res = gptimer_set_alarm_action(data_fast.read_timer, &alarm_config)) != ESP_OK)
 		return collect_err(BIODYN_DATAFAST_COULDNT_CREATE_TIMER, "Could not set gptimer alarm config: code", res);
@@ -203,6 +209,7 @@ void data_fast_read()
 		datapoint->emg = 0;
 		datapoint->orientation = mahony_fusion(&data, data_fast.curr_orientation, elapsed);
 		data_fast.curr_orientation = datapoint->orientation;
+		++data_fast.datapoints_since_ble_read;
 
 		xSemaphoreGive(data_fast.data_mutex); // Give mutex
 	}
@@ -214,14 +221,17 @@ void ble_data_fast_packed(uint16_t *size, void *out)
 	// Take mutex
 	if (xSemaphoreTake(data_fast.data_mutex, portMAX_DELAY))
 	{
-		int current_size = data_fast.data_ptr;
-		int old_size = data_fast.data_cnt - data_fast.data_ptr;
-		timed_read *p = &data_fast.raw_data[0];
-		memcpy(out + (old_size * sizeof(timed_read)), p, current_size * sizeof(timed_read));
-		memcpy(out, p, old_size * sizeof(timed_read));
-		*size = IMU_DATA_CNT * sizeof(timed_read);
-		// timed_read *latest = &((timed_read *)out)[IMU_DATA_CNT - 1];
-		// ESP_LOGI(TAG, "x: %.2f, y: %.2f, z: %.2f at %lld", latest->data.accel_x, latest->data.accel_y, latest->data.accel_z, latest->ticker);
+		int new_size = data_fast.data_ptr + 1;
+		int old_size = data_fast.data_cnt - new_size;
+		// New data is 0..data_ptr
+		// Old data is data_ptr..data_cnt
+		timed_read *old = &data_fast.raw_data[(data_fast.data_ptr + 1) % data_fast.data_cnt];
+		timed_read *new = &data_fast.raw_data[0];
+		memcpy(out, old, sizeof(timed_read) * old_size);
+		memcpy(out + sizeof(timed_read) * old_size, new, sizeof(timed_read) * new_size);
+		*size = sizeof(timed_read) * data_fast.data_cnt;
+		data_fast.datapoints_since_ble_read = 0;
+
 		xSemaphoreGive(data_fast.data_mutex); // Give mutex
 	}
 }
