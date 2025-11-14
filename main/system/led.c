@@ -92,17 +92,14 @@ void led_get_state(uint16_t *len, void *dst)
 
 bool led_has_error()
 {
-	return true;
-	// return led_data.led_error;
+	return led_data.led_error;
 }
 
 const char *led_get_error()
 {
-	return "LED FAILED A WHOLE LOTTA THINGS";
-	// return led_data.led_error_msg;
+	return led_data.led_error_msg;
 }
 
 esp_err_t led_self_test() {
-	return 1;
-	// return 0;
+	return 0;
 }
