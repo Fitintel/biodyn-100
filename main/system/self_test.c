@@ -28,7 +28,7 @@ static struct
 	self_test_state state;
 	const biodyn_system *systems;
 	int n_systems;
-	char err_msg[256];
+	char err_msg[450];
 } self_test_data = {not_started, biodyn_systems, LEN_OF_STATIC_ARRAY(biodyn_systems), ""};
 
 /* ----------------------------
@@ -101,16 +101,28 @@ void self_test_start()
 			{
 				const char *msg = sys->get_error();
 				ESP_LOGE(ST_TAG, "System %s has error: %s", sys->name, msg);
+
+				// Check if message is too long
+				if (strlen(msg) > 256)
+					ESP_LOGE(ST_TAG, "Error message too long to collect: len %d", strlen(msg));
+
 				// Set error message
-				snprintf(self_test_data.err_msg, sizeof(self_test_data.err_msg),
-						 "System \"%s\" has error:\n%s", sys->name, msg);
+				char finalMsg[256];
+				snprintf(finalMsg, sizeof(finalMsg), "System \"%s\" has error:\n%s\n", sys->name, msg);
+
+				// Check if all messages combined is too long
+				if (strlen(finalMsg) + strlen(self_test_data.err_msg) > sizeof(self_test_data.err_msg))
+					ESP_LOGE(ST_TAG, "Got too many errors to collect!");
+				else
+					snprintf(self_test_data.err_msg + strlen(self_test_data.err_msg),
+							 sizeof(self_test_data.err_msg) - strlen(self_test_data.err_msg),
+							 finalMsg);
 				self_test_data.state = completed_with_err;
-				return;
 			}
 		}
 
-	// All good
-	self_test_data.state = completed_ok;
+	if (self_test_data.state != completed_with_err)
+		self_test_data.state = completed_ok;
 
 	ESP_LOGI(ST_TAG, "All systems passed self-test");
 }
